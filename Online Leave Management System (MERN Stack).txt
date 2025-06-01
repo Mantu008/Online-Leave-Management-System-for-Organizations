@@ -121,8 +121,6 @@ Calendar view of team availability
 🤝 Contributing
 Contributions are welcome! Please open an issue first to discuss what you would like to change.
 
-📄 License
-This project is open-source and available under the MIT License.
 
 Let me know if you want me to:
 
