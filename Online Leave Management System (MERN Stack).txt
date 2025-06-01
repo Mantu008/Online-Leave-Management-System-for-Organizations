@@ -125,6 +125,6 @@ Let me know if you want me to:
 
 Add actual code for API routes or components
 
-Generate wireframes or UI designs
+Generate wireframes or UI design
 
 Add a database seed script for holidays and demo users
