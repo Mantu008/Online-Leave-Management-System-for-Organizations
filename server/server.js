@@ -4,22 +4,46 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const http = require("http");
 const socketIo = require("socket.io");
+const { Server } = require("socket.io");
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
+const io = new Server(server, {
     cors: {
-        origin: "http://localhost:5173",
-        methods: ["GET", "POST"],
+        origin: ["http://localhost:3000", "http://localhost:5173"],
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+        credentials: true
     },
 });
 
 // Middlewares
 app.use(cors());
 app.use(express.json());
+
+// Socket.io connection handling
+io.on("connection", (socket) => {
+    console.log("New client connected");
+
+    // Join department room
+    socket.on("joinDepartment", (department) => {
+        socket.join(department);
+    });
+
+    // Join user room
+    socket.on("joinUser", (userId) => {
+        socket.join(userId);
+    });
+
+    socket.on("disconnect", () => {
+        console.log("Client disconnected");
+    });
+});
+
+// Make io accessible to routes
+app.set("io", io);
 
 // Database connection
 mongoose
@@ -28,15 +52,6 @@ mongoose
     )
     .then(() => console.log("Connected to MongoDB"))
     .catch((err) => console.error("MongoDB connection error:", err));
-
-// Socket.io connection
-io.on("connection", (socket) => {
-    console.log("A user connected");
-
-    socket.on("disconnect", () => {
-        console.log("User disconnected");
-    });
-});
 
 // Routes
 app.use("/api/auth", require("./routes/auth"));

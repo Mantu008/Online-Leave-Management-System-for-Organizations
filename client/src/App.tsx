@@ -29,6 +29,10 @@ import AdminDashboard from './components/dashboard/AdminDashboard';
 // Team Components
 import TeamCalendar from './components/team/TeamCalendar';
 
+// Notification Components
+import Notification from './components/common/Notification';
+import NotificationsPage from './components/notifications/NotificationsPage';
+
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, token } = useSelector((state: RootState) => state.auth);
@@ -48,6 +52,7 @@ const App: React.FC = () => {
       <Router>
         <div className="min-h-screen bg-gray-50">
           <Navbar />
+          <Notification />
           <main className="container mx-auto px-4 py-8">
             <Routes>
               {/* Public Routes */}
@@ -72,6 +77,15 @@ const App: React.FC = () => {
                     ) : (
                       <EmployeeDashboard />
                     )}
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/notifications"
+                element={
+                  <ProtectedRoute>
+                    <NotificationsPage />
                   </ProtectedRoute>
                 }
               />

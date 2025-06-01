@@ -1,14 +1,3 @@
-# Online-Leave-Management-System-for-Organizations
-The Online Leave Management System is a full-stack web application built using the MERN stack (MongoDB, Express.js, React.js, Node.js). It allows employees to apply for leaves, view their leave history, and track approvals. Managers can view, approve, or reject leave requests, while the system automatically prevents applications on holidays.
-
-
-
-
-Great! Here's your finalized **`README.md`** file for the **Online Leave Management System (MERN Stack)** project, with your personal details (email & GitHub) included:
-
----
-
-````markdown
 # 🗓️ Online Leave Management System (MERN Stack)
 
 A web-based leave application and approval system for organizations. This system allows employees to apply for leave, and managers to review, approve, or reject requests. It features real-time notifications, automatic holiday blocking, and a user-friendly dashboard for each role.
@@ -63,7 +52,7 @@ A web-based leave application and approval system for organizations. This system
   role: 'employee' | 'manager',
   leaveBalance: Number
 }
-````
+```
 
 ### 📄 LeaveRequest Model
 

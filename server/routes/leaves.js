@@ -156,7 +156,8 @@ router.patch('/:id', [
 
   try {
     const { status, managerNote } = req.body;
-    const leaveRequest = await LeaveRequest.findById(req.params.id);
+    const leaveRequest = await LeaveRequest.findById(req.params.id)
+      .populate('employee', 'name email department');
 
     if (!leaveRequest) {
       return res.status(404).json({ message: 'Leave request not found' });
@@ -179,6 +180,35 @@ router.patch('/:id', [
     }
 
     await leaveRequest.save();
+
+    // Emit notification to employee
+    const io = req.app.get('io');
+    io.to(leaveRequest.employee._id.toString()).emit('leaveStatusUpdate', {
+      type: 'leaveStatusUpdate',
+      message: `Your leave request from ${new Date(leaveRequest.startDate).toLocaleDateString()} to ${new Date(leaveRequest.endDate).toLocaleDateString()} has been ${status}`,
+      leaveRequest: {
+        id: leaveRequest._id,
+        status,
+        startDate: leaveRequest.startDate,
+        endDate: leaveRequest.endDate,
+        leaveType: leaveRequest.leaveType,
+        managerNote
+      }
+    });
+
+    // Emit notification to department
+    io.to(leaveRequest.department).emit('departmentLeaveUpdate', {
+      type: 'departmentLeaveUpdate',
+      message: `${leaveRequest.employee.name}'s leave request from ${new Date(leaveRequest.startDate).toLocaleDateString()} to ${new Date(leaveRequest.endDate).toLocaleDateString()} has been ${status}`,
+      leaveRequest: {
+        id: leaveRequest._id,
+        employee: leaveRequest.employee.name,
+        status,
+        startDate: leaveRequest.startDate,
+        endDate: leaveRequest.endDate,
+        leaveType: leaveRequest.leaveType
+      }
+    });
 
     res.json(leaveRequest);
   } catch (err) {
@@ -204,6 +234,20 @@ router.get('/team', auth, async (req, res) => {
   } catch (err) {
     console.error('Get team leaves error:', err);
     res.status(500).json({ message: 'Server error while fetching team leaves' });
+  }
+});
+
+// Get leaves for logged-in user
+router.get('/my-leaves', auth, async (req, res) => {
+  try {
+    const leaves = await LeaveRequest.find({ employee: req.user._id })
+      .populate('employee', 'name email department')
+      .sort({ createdAt: -1 });
+    
+    res.json(leaves);
+  } catch (error) {
+    console.error('Error fetching user leaves:', error);
+    res.status(500).json({ message: 'Error fetching leaves' });
   }
 });
 
