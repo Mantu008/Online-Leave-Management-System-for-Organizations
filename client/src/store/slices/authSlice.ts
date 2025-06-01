@@ -2,9 +2,9 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { User, LoginCredentials, RegisterData, AuthState } from '../../types';
 import { loginUser, registerUser, getCurrentUser } from '../../services/api';
 
-// Get token and user data from localStorage
-const token = localStorage.getItem('token');
-const storedUser = localStorage.getItem('user');
+// Get token and user data from sessionStorage
+const token = sessionStorage.getItem('token');
+const storedUser = sessionStorage.getItem('user');
 
 const initialState: AuthState = {
     user: storedUser ? JSON.parse(storedUser) : null,
@@ -19,11 +19,11 @@ if (token && !storedUser) {
     getCurrentUser()
         .then(response => {
             initialState.user = response;
-            localStorage.setItem('user', JSON.stringify(response));
+            sessionStorage.setItem('user', JSON.stringify(response));
         })
         .catch(() => {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
+            sessionStorage.removeItem('token');
+            sessionStorage.removeItem('user');
             initialState.token = null;
             initialState.user = null;
             initialState.isAuthenticated = false;
@@ -35,8 +35,8 @@ export const login = createAsyncThunk(
     async (credentials: LoginCredentials, { rejectWithValue }) => {
         try {
             const data = await loginUser(credentials);
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('user', JSON.stringify(data.user));
+            sessionStorage.setItem('token', data.token);
+            sessionStorage.setItem('user', JSON.stringify(data.user));
             return data;
         } catch (error: any) {
             return rejectWithValue(error.message || 'Login failed');
@@ -49,8 +49,8 @@ export const register = createAsyncThunk(
     async (userData: RegisterData, { rejectWithValue }) => {
         try {
             const data = await registerUser(userData);
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('user', JSON.stringify(data.user));
+            sessionStorage.setItem('token', data.token);
+            sessionStorage.setItem('user', JSON.stringify(data.user));
             return data;
         } catch (error: any) {
             return rejectWithValue(error.message || 'Registration failed');
@@ -67,15 +67,15 @@ const authSlice = createSlice({
             state.token = null;
             state.isAuthenticated = false;
             state.error = null;
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
+            sessionStorage.removeItem('token');
+            sessionStorage.removeItem('user');
         },
         clearError: (state) => {
             state.error = null;
         },
         updateUser: (state, action: PayloadAction<User>) => {
             state.user = action.payload;
-            localStorage.setItem('user', JSON.stringify(action.payload));
+            sessionStorage.setItem('user', JSON.stringify(action.payload));
         },
     },
     extraReducers: (builder) => {
@@ -98,8 +98,8 @@ const authSlice = createSlice({
                 state.isAuthenticated = false;
                 state.token = null;
                 state.user = null;
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
+                sessionStorage.removeItem('token');
+                sessionStorage.removeItem('user');
             })
             // Register
             .addCase(register.pending, (state) => {
@@ -119,8 +119,8 @@ const authSlice = createSlice({
                 state.isAuthenticated = false;
                 state.token = null;
                 state.user = null;
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
+                sessionStorage.removeItem('token');
+                sessionStorage.removeItem('user');
             });
     },
 });
