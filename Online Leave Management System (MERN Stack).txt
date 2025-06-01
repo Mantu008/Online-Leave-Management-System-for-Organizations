@@ -1,0 +1,133 @@
+📌 Title
+Online Leave Management System (MERN Stack)
+A web-based leave application and approval system for organizations with role-based access, holiday blocking, and real-time notifications.
+
+📝 Description
+The Online Leave Management System is a full-stack web application built using the MERN stack (MongoDB, Express.js, React.js, Node.js). It allows employees to apply for leaves, view their leave history, and track approvals. Managers can view, approve, or reject leave requests, while the system automatically prevents applications on predefined holidays.
+
+This project aims to streamline the leave process within an organization with a user-friendly interface and real-time notification support.
+
+🚀 Features
+👩‍💼 For Employees
+Apply for leave with custom date ranges
+
+View current leave status and history
+
+Get notified when leave is approved/rejected
+
+See upcoming holidays and available leave balance
+
+👨‍💼 For Managers
+View pending leave requests
+
+Approve or reject requests with comments
+
+View team availability in a calendar view
+
+🛠️ System Features
+Role-based authentication (Employee, Manager)
+
+JWT-based login and session handling
+
+Auto-blocking of leaves on public holidays
+
+Real-time notifications using Socket.io (optional)
+
+Clean and responsive UI with Tailwind CSS or Bootstrap
+
+🧰 Tech Stack
+Layer	Technology
+Frontend	React.js, Axios, React Router
+Backend	Node.js, Express.js
+Database	MongoDB with Mongoose
+Auth	JWT Authentication
+Real-time	Socket.io (optional)
+Styling	Tailwind CSS or Bootstrap
+
+📂 Project Structure
+bash
+Copy
+Edit
+leave-management/
+├── client/                # React frontend
+│   ├── src/
+│   └── public/
+├── server/                # Node.js backend
+│   ├── models/
+│   ├── routes/
+│   ├── controllers/
+│   ├── middlewares/
+│   └── utils/
+├── .env
+├── README.md
+└── package.json
+🔐 User Roles
+Employee – Can apply for and view leave requests
+
+Manager – Can approve/reject leave requests
+
+Admin (optional) – Can manage users and holidays
+
+🚧 Getting Started
+1. Clone the repository
+bash
+Copy
+Edit
+git clone https://github.com/yourusername/leave-management.git
+cd leave-management
+2. Install dependencies
+bash
+Copy
+Edit
+# For backend
+cd server
+npm install
+
+# For frontend
+cd ../client
+npm install
+3. Set up environment variables
+Create a .env file in the server/ directory with the following:
+
+env
+Copy
+Edit
+PORT=5000
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
+4. Run the app
+bash
+Copy
+Edit
+# Start backend
+cd server
+npm run dev
+
+# Start frontend
+cd ../client
+npm start
+📸 Screenshots
+You can add UI screenshots here for the login page, leave form, manager dashboard, etc.
+
+📈 Future Enhancements
+Admin panel for managing users and holidays
+
+Email notifications
+
+PDF download of leave reports
+
+Calendar view of team availability
+
+🤝 Contributing
+Contributions are welcome! Please open an issue first to discuss what you would like to change.
+
+📄 License
+This project is open-source and available under the MIT License.
+
+Let me know if you want me to:
+
+Add actual code for API routes or components
+
+Generate wireframes or UI designs
+
+Add a database seed script for holidays and demo users
