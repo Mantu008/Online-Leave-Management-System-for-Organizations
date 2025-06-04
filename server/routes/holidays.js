@@ -10,18 +10,18 @@ router.get('/', auth, async (req, res) => {
   try {
     const { year } = req.query;
     
-    // Validate year parameter
-    if (!year) {
-      return res.status(400).json({ message: 'Year parameter is required' });
-    }
-
-    const yearNum = parseInt(year);
+    // If no year is provided, use current year
+    const yearNum = year ? parseInt(year) : new Date().getFullYear();
+    
     if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
       return res.status(400).json({ message: 'Invalid year parameter' });
     }
 
     const startDate = new Date(yearNum, 0, 1);
     const endDate = new Date(yearNum, 11, 31);
+
+    console.log('Fetching holidays for year:', yearNum); // Debug log
+    console.log('Date range:', { startDate, endDate }); // Debug log
 
     const holidays = await Holiday.find({
       date: {
@@ -30,6 +30,7 @@ router.get('/', auth, async (req, res) => {
       },
     }).sort({ date: 1 });
 
+    console.log('Found holidays:', holidays.length); // Debug log
     res.json(holidays);
   } catch (err) {
     console.error('Error fetching holidays:', err);
@@ -54,13 +55,14 @@ router.post('/', auth, async (req, res) => {
       date,
       type,
       description,
+      createdBy: req.user._id,
     });
 
     await holiday.save();
     res.json(holiday);
   } catch (err) {
     console.error('Error creating holiday:', err);
-    res.status(500).json({ message: 'Server error while creating holiday' });
+    res.status(500).json({ message: 'Server error while creating holiday', error: err.message });
   }
 });
 
@@ -81,16 +83,17 @@ router.patch('/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Holiday not found' });
     }
 
-    if (name) holiday.name = name;
-    if (date) holiday.date = date;
-    if (type) holiday.type = type;
-    if (description !== undefined) holiday.description = description;
+    holiday.name = name || holiday.name;
+    holiday.date = date || holiday.date;
+    holiday.type = type || holiday.type;
+    holiday.description = description || holiday.description;
+    holiday.createdBy = req.user._id;
 
     await holiday.save();
     res.json(holiday);
   } catch (err) {
     console.error('Error updating holiday:', err);
-    res.status(500).json({ message: 'Server error while updating holiday' });
+    res.status(500).json({ message: 'Server error while updating holiday', error: err.message });
   }
 });
 

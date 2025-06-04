@@ -57,8 +57,11 @@ export interface Holiday {
     _id: string;
     name: string;
     date: string;
-    type: 'public' | 'company';
+    type: 'public' | 'company' | 'optional';
     description?: string;
+    isRecurring: boolean;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export interface AuthState {

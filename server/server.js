@@ -58,6 +58,7 @@ app.use("/api/auth", require("./routes/auth"));
 app.use("/api/leaves", require("./routes/leaves"));
 app.use("/api/holidays", require("./routes/holidays"));
 app.use("/api/users", require("./routes/users"));
+app.use("/api/admin", require("./routes/adminRoutes"));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

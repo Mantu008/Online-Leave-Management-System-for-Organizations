@@ -47,22 +47,16 @@ router.get('/department', auth, async (req, res) => {
     }
 });
 
-// Get pending leave requests (manager only)
+// Get pending leave requests (admin only)
 router.get('/pending', auth, async (req, res) => {
     try {
-        if (req.user.role !== 'manager') {
+        if (req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Not authorized to view pending leaves' });
         }
         const leaves = await LeaveRequest.find({ status: 'pending' })
-            .populate({
-                path: 'user',
-                match: { department: req.user.department }
-            })
+            .populate('employee', 'name email')
             .exec();
-        
-        // Filter out leaves where user is null (not in same department)
-        const departmentLeaves = leaves.filter(leave => leave.user !== null);
-        res.json(departmentLeaves);
+        res.json(leaves);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

@@ -10,30 +10,57 @@ This project aims to streamline the leave process within an organization with a 
 🚀 Features
 👩‍💼 For Employees
 Apply for leave with custom date ranges
-
 View current leave status and history
-
 Get notified when leave is approved/rejected
-
 See upcoming holidays and available leave balance
 
 👨‍💼 For Managers
 View pending leave requests
-
 Approve or reject requests with comments
-
 View team availability in a calendar view
 
+👨‍💼 For Administrators
+Admin Dashboard
+- Overview statistics
+  - User counts by role
+  - Leave request statistics
+  - Holiday count for the current year
+  - Visual charts for leave data
+- User Management
+  - List all users with pagination
+  - Search users by name or email
+  - Add new users
+  - Edit existing users
+  - Delete users
+  - Role-based user creation (Employee, Manager, Admin)
+- Holiday Management
+  - List all holidays
+  - Add new holidays
+  - Edit existing holidays
+  - Delete holidays
+  - Support for different holiday types (Public, Company, Optional)
+  - Recurring holiday support
+
 🛠️ System Features
-Role-based authentication (Employee, Manager)
-
+Role-based authentication (Employee, Manager, Admin)
 JWT-based login and session handling
-
 Auto-blocking of leaves on public holidays
-
 Real-time notifications using Socket.io (optional)
-
 Clean and responsive UI with Tailwind CSS or Bootstrap
+
+Security Features
+- Role-based access control
+- Protected admin routes
+- JWT authentication
+- Secure password handling
+
+UI/UX Features
+- Responsive design
+- Modern and clean interface
+- Interactive data tables
+- Modal forms for data entry
+- Loading states and error handling
+- Confirmation dialogs for deletions
 
 🧰 Tech Stack
 Layer	Technology
@@ -51,22 +78,47 @@ Edit
 leave-management/
 ├── client/                # React frontend
 │   ├── src/
+│   │   ├── components/
+│   │   │   ├── admin/    # Admin components
+│   │   │   │   ├── Dashboard.tsx
+│   │   │   │   ├── UserManagement.tsx
+│   │   │   │   ├── HolidayManagement.tsx
+│   │   │   │   └── AdminLayout.tsx
+│   │   │   ├── manager/  # Manager components
+│   │   │   └── employee/ # Employee components
+│   │   ├── pages/
+│   │   ├── services/
+│   │   ├── utils/
+│   │   └── App.tsx
 │   └── public/
 ├── server/                # Node.js backend
 │   ├── models/
+│   │   ├── User.js
+│   │   ├── LeaveRequest.js
+│   │   ├── Holiday.js
+│   │   └── Department.js
 │   ├── routes/
+│   │   ├── auth.js
+│   │   ├── leaveRoutes.js
+│   │   ├── adminRoutes.js
+│   │   └── holidayRoutes.js
 │   ├── controllers/
+│   │   ├── authController.js
+│   │   ├── leaveController.js
+│   │   ├── adminController.js
+│   │   └── holidayController.js
 │   ├── middlewares/
+│   │   ├── auth.js
+│   │   └── roleCheck.js
 │   └── utils/
 ├── .env
 ├── README.md
 └── package.json
+
 🔐 User Roles
 Employee – Can apply for and view leave requests
-
 Manager – Can approve/reject leave requests
-
-Admin (optional) – Can manage users and holidays
+Admin – Can manage users and holidays
 
 🚧 Getting Started
 1. Clone the repository
@@ -110,21 +162,14 @@ npm start
 You can add UI screenshots here for the login page, leave form, manager dashboard, etc.
 
 📈 Future Enhancements
-Admin panel for managing users and holidays
-
 Email notifications
-
 PDF download of leave reports
-
 Calendar view of team availability
 
 🤝 Contributing
 Contributions are welcome! Please open an issue first to discuss what you would like to change.
 
 Let me know if you want me to:
-
 Add actual code for API routes or components
-
 Generate wireframes or UI design
-
 Add a database seed script for holidays and demo users

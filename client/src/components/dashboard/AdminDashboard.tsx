@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
   People as PeopleIcon,
   Event as EventIcon,
@@ -12,6 +13,18 @@ import {
   CalendarMonth as CalendarIcon,
 } from '@mui/icons-material';
 import { RootState } from '../../store';
+
+interface DashboardStats {
+  totalUsers: number;
+  pendingRequests: number;
+  departments: number;
+  holidaysThisMonth: number;
+  userRoles: {
+    employee: number;
+    manager: number;
+    admin: number;
+  };
+}
 
 interface DashboardCardProps {
   title: string;
@@ -65,6 +78,32 @@ const StatCard: React.FC<{
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useSelector((state: RootState) => state.auth);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDashboardStats = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const token = sessionStorage.getItem('token');
+        const response = await axios.get('http://localhost:5000/api/admin/dashboard', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        setStats(response.data);
+      } catch (error: any) {
+        console.error('Error fetching dashboard stats:', error);
+        setError(error.response?.data?.message || 'Failed to fetch dashboard statistics');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardStats();
+  }, []);
 
   if (!user) {
     return null;
@@ -101,32 +140,48 @@ const AdminDashboard: React.FC = () => {
     },
   ];
 
-  const stats = [
+  const statCards = stats ? [
     {
-      value: 150,
+      value: stats.totalUsers,
       label: 'Total Employees',
       icon: <GroupIcon className="text-blue-500" />,
       color: 'bg-blue-100',
     },
     {
-      value: 25,
+      value: stats.pendingRequests,
       label: 'Pending Requests',
       icon: <PendingIcon className="text-orange-500" />,
       color: 'bg-orange-100',
     },
     {
-      value: 8,
+      value: stats.departments,
       label: 'Departments',
       icon: <BusinessIcon className="text-green-500" />,
       color: 'bg-green-100',
     },
     {
-      value: 12,
+      value: stats.holidaysThisMonth,
       label: 'Holidays This Month',
       icon: <CalendarIcon className="text-purple-500" />,
       color: 'bg-purple-100',
     },
-  ];
+  ] : [];
+
+  if (loading) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="text-center">Loading dashboard statistics...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="text-red-500 text-center">{error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -150,10 +205,31 @@ const AdminDashboard: React.FC = () => {
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
+          {statCards.map((stat, index) => (
             <StatCard key={index} {...stat} />
           ))}
         </div>
+
+        {/* User Role Distribution */}
+        {stats?.userRoles && (
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">User Role Distribution</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Employees</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.userRoles.employee}</p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Managers</p>
+                <p className="text-2xl font-bold text-green-600">{stats.userRoles.manager}</p>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Admins</p>
+                <p className="text-2xl font-bold text-purple-600">{stats.userRoles.admin}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const auth = require('../middleware/auth');
+const { protect } = require('../middlewares/authMiddleware');
 
 // @route   POST /api/auth/register
 // @desc    Register a user
@@ -42,10 +42,12 @@ router.post('/register', [
 
     // Create token
     const token = jwt.sign(
-      { userId: user._id },
+      { userId: user._id.toString() },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
+
+    console.log('Generated token payload:', { userId: user._id.toString() });
 
     res.status(201).json({
       token,
@@ -77,25 +79,32 @@ router.post('/login', [
     }
 
     const { email, password } = req.body;
+    console.log('Login attempt for email:', email);
 
     // Check if user exists
     const user = await User.findOne({ email });
     if (!user) {
+      console.log('User not found:', email);
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      console.log('Invalid password for user:', email);
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
+    console.log('Login successful for user:', { id: user._id, role: user.role });
+
     // Create token
     const token = jwt.sign(
-      { userId: user._id },
+      { userId: user._id.toString() },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
+
+    console.log('Generated token payload:', { userId: user._id.toString() });
 
     // Ensure leaveBalance exists
     if (!user.leaveBalance) {
@@ -107,16 +116,20 @@ router.post('/login', [
       await user.save();
     }
 
+    const userResponse = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      department: user.department,
+      leaveBalance: user.leaveBalance
+    };
+
+    console.log('Sending response:', { token: token.substring(0, 20) + '...', user: userResponse });
+
     res.json({
       token,
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        department: user.department,
-        leaveBalance: user.leaveBalance
-      }
+      user: userResponse
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -127,7 +140,7 @@ router.post('/login', [
 // @route   GET /api/auth/me
 // @desc    Get current user
 // @access  Private
-router.get('/me', auth, async (req, res) => {
+router.get('/me', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
     if (!user) {
@@ -155,7 +168,7 @@ router.get('/me', auth, async (req, res) => {
 // @desc    Update user role (Admin only)
 // @access  Private (Admin)
 router.patch('/users/:id/role', [
-  auth,
+  protect,
   body('role').isIn(['employee', 'manager', 'admin']).withMessage('Invalid role')
 ], async (req, res) => {
   try {

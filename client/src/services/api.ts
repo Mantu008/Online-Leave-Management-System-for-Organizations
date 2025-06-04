@@ -3,7 +3,7 @@ import { LoginCredentials, RegisterData, AuthResponse, LeaveRequestData, LeaveRe
 import { store } from '../store';
 import { logout } from '../store/slices/authSlice';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const api = axios.create({
     baseURL: API_URL,
@@ -17,19 +17,28 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     const token = sessionStorage.getItem('token');
     const user = sessionStorage.getItem('user');
 
+    console.log('Making request with token:', token ? 'Present' : 'Missing'); // Debug log
+
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log('Authorization header set:', config.headers.Authorization); // Debug log
     }
 
     // Add user role and department to headers for role-based access control
     if (user) {
-        const userData = JSON.parse(user);
-        config.headers['X-User-Role'] = userData.role;
-        config.headers['X-User-Department'] = userData.department;
+        try {
+            const userData = JSON.parse(user);
+            config.headers['X-User-Role'] = userData.role;
+            config.headers['X-User-Department'] = userData.department;
+            console.log('User headers set:', { role: userData.role, department: userData.department }); // Debug log
+        } catch (error) {
+            console.error('Error parsing user data:', error); // Debug log
+        }
     }
 
     return config;
 }, (error) => {
+    console.error('Request interceptor error:', error); // Debug log
     return Promise.reject(error);
 });
 
@@ -37,28 +46,27 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 api.interceptors.response.use(
     (response) => response,
     (error: AxiosError) => {
+        console.error('Response error:', error.response?.status, error.response?.data); // Debug log
+
         if (error.response) {
             // Handle 401 Unauthorized errors
             if (error.response.status === 401) {
+                console.log('Unauthorized error, logging out...'); // Debug log
                 store.dispatch(logout());
                 window.location.href = '/login';
             }
             // Handle 403 Forbidden errors (role-based access)
             if (error.response.status === 403) {
+                console.log('Forbidden error, logging out...'); // Debug log
                 store.dispatch(logout());
                 window.location.href = '/login';
             }
-            // The request was made and the server responded with a status code
-            // that falls out of the range of 2xx
-            console.error('API Error:', error.response.data);
             return Promise.reject(error.response.data);
         } else if (error.request) {
-            // The request was made but no response was received
-            console.error('No response received:', error.request);
+            console.error('No response received:', error.request); // Debug log
             return Promise.reject({ message: 'No response from server' });
         } else {
-            // Something happened in setting up the request that triggered an Error
-            console.error('Request setup error:', error.message);
+            console.error('Request setup error:', error.message); // Debug log
             return Promise.reject({ message: 'Error setting up request' });
         }
     }

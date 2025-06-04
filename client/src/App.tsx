@@ -19,7 +19,7 @@ import LeaveRequests from './components/leave/LeaveRequests';
 
 // Holiday Components
 import HolidayCalendar from './components/holiday/HolidayCalendar';
-import HolidayManagement from './components/holiday/HolidayManagement';
+import HolidayManagement from './components/admin/HolidayManagement';
 
 // Dashboard Components
 import EmployeeDashboard from './components/dashboard/EmployeeDashboard';

@@ -16,8 +16,7 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
-    minlength: 6
+    required: true
   },
   role: {
     type: String,
@@ -28,23 +27,25 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  leaveBalance: {
-    annual: {
-      type: Number,
-      default: 20
-    },
-    sick: {
-      type: Number,
-      default: 10
-    },
-    casual: {
-      type: Number,
-      default: 5
-    }
+  position: {
+    type: String,
+    required: true
   },
   joiningDate: {
     type: Date,
-    default: Date.now
+    required: true
+  },
+  leaveBalance: {
+    annual: { type: Number, default: 20 },
+    sick: { type: Number, default: 10 },
+    casual: { type: Number, default: 10 }
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  lastLogin: {
+    type: Date
   }
 }, {
   timestamps: true
@@ -53,19 +54,13 @@ const userSchema = new mongoose.Schema({
 // Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
-  
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
 });
 
 // Method to compare password
 userSchema.methods.comparePassword = async function(candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
+  return await bcrypt.compare(candidatePassword, this.password);
 };
 
 module.exports = mongoose.model('User', userSchema); 
