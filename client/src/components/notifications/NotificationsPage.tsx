@@ -1,92 +1,73 @@
-import React, { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
+import React, { useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { io, Socket } from 'socket.io-client';
-import { Alert, CircularProgress, List, ListItem, ListItemText, Typography, Paper, Snackbar } from '@mui/material';
+import { markAllAsRead, markAsRead } from '../../store/slices/notificationSlice';
+import {
+  Alert,
+  CircularProgress,
+  List,
+  ListItem,
+  ListItemText,
+  Typography,
+  Paper,
+  Button,
+  IconButton,
+  Box,
+} from '@mui/material';
+import {
+  EventNote as LeaveIcon,
+  Event as HolidayIcon,
+  Person as UserIcon,
+  Warning as SystemIcon,
+  CheckCircle as ReadIcon,
+} from '@mui/icons-material';
 
-interface Notification {
-  type: string;
-  message: string;
-  leaveRequest?: any;
-  timestamp: string;
-}
+const getNotificationIcon = (type: string) => {
+  switch (type) {
+    case 'leave':
+      return <LeaveIcon className="text-blue-500" />;
+    case 'holiday':
+      return <HolidayIcon className="text-green-500" />;
+    case 'user':
+      return <UserIcon className="text-purple-500" />;
+    case 'system':
+      return <SystemIcon className="text-red-500" />;
+    default:
+      return null;
+  }
+};
 
 const NotificationsPage: React.FC = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [currentNotification, setCurrentNotification] = useState<Notification | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useDispatch();
+  const { notifications } = useSelector((state: RootState) => state.notifications);
   const { user } = useSelector((state: RootState) => state.auth);
 
   useEffect(() => {
-    if (!user) return;
+    // Mark all notifications as read when viewing the page
+    dispatch(markAllAsRead());
+  }, [dispatch]);
 
-    // Connect to Socket.io server
-    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
-      withCredentials: true,
-      transports: ['websocket', 'polling']
-    });
-
-    // Join user's room
-    socket.emit('joinUser', user._id);
-
-    // Join department room
-    if (user.department) {
-      socket.emit('joinDepartment', user.department);
-    }
-
-    // Listen for notifications
-    socket.on('leaveStatusUpdate', (data: Notification) => {
-      const newNotification = {
-        ...data,
-        timestamp: new Date().toISOString()
-      };
-      setNotifications(prev => [newNotification, ...prev]);
-      setCurrentNotification(newNotification);
-    });
-
-    socket.on('departmentLeaveUpdate', (data: Notification) => {
-      if (user.role === 'manager') {
-        const newNotification = {
-          ...data,
-          timestamp: new Date().toISOString()
-        };
-        setNotifications(prev => [newNotification, ...prev]);
-        setCurrentNotification(newNotification);
-      }
-    });
-
-    setLoading(false);
-
-    return () => {
-      socket.close();
-    };
-  }, [user]);
-
-  const handleCloseNotification = () => {
-    setCurrentNotification(null);
+  const handleMarkAsRead = (id: string) => {
+    dispatch(markAsRead(id));
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <CircularProgress />
-      </div>
-    );
-  }
+  if (!user) return null;
 
   return (
     <div className="p-6">
       <div className="max-w-4xl mx-auto">
-        <Typography variant="h4" className="mb-6">
-          Notifications
-        </Typography>
-
-        {error && (
-          <Alert severity="error" className="mb-4">
-            {error}
-          </Alert>
-        )}
+        <div className="flex justify-between items-center mb-6">
+          <Typography variant="h4">
+            Notifications
+          </Typography>
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={() => dispatch(markAllAsRead())}
+          >
+            Mark All as Read
+          </Button>
+        </div>
 
         {notifications.length === 0 ? (
           <Paper className="p-6 text-center">
@@ -96,35 +77,60 @@ const NotificationsPage: React.FC = () => {
           </Paper>
         ) : (
           <List>
-            {notifications.map((notification, index) => (
+            {notifications.map((notification) => (
               <ListItem
-                key={index}
-                className="mb-2 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                key={notification.id}
+                className={`mb-2 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow ${
+                  !notification.read ? 'border-l-4 border-primary-main' : ''
+                }`}
               >
-                <ListItemText
-                  primary={notification.message}
-                  secondary={new Date(notification.timestamp).toLocaleString()}
-                />
+                <Box className="flex items-start w-full">
+                  <Box className="mr-4 mt-1">
+                    {getNotificationIcon(notification.type)}
+                  </Box>
+                  <Box className="flex-grow">
+                    <ListItemText
+                      primary={notification.message}
+                      secondary={new Date(notification.timestamp).toLocaleString()}
+                    />
+                    {notification.data && (
+                      <Box className="mt-2 text-sm text-gray-600">
+                        {notification.type === 'leave' && (
+                          <div>
+                            <p>Leave Type: {notification.data.leaveType}</p>
+                            <p>Duration: {new Date(notification.data.startDate).toLocaleDateString()} to {new Date(notification.data.endDate).toLocaleDateString()}</p>
+                          </div>
+                        )}
+                        {notification.type === 'holiday' && (
+                          <div>
+                            <p>Date: {new Date(notification.data.date).toLocaleDateString()}</p>
+                            <p>Description: {notification.data.description}</p>
+                          </div>
+                        )}
+                        {notification.type === 'user' && (
+                          <div>
+                            <p>Role: {notification.data.role}</p>
+                            <p>Department: {notification.data.department}</p>
+                          </div>
+                        )}
+                      </Box>
+                    )}
+                  </Box>
+                  {!notification.read && (
+                    <IconButton
+                      size="small"
+                      onClick={() => handleMarkAsRead(notification.id)}
+                      className="ml-2"
+                    >
+                      <ReadIcon className="text-green-500" />
+                    </IconButton>
+                  )}
+                </Box>
               </ListItem>
             ))}
           </List>
         )}
       </div>
-
-      <Snackbar
-        open={!!currentNotification}
-        autoHideDuration={6000}
-        onClose={handleCloseNotification}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-      >
-        <Alert
-          onClose={handleCloseNotification}
-          severity={currentNotification?.type === 'leaveStatusUpdate' ? 'info' : 'success'}
-          sx={{ width: '100%' }}
-        >
-          {currentNotification?.message}
-        </Alert>
-      </Snackbar>
     </div>
   );
 };

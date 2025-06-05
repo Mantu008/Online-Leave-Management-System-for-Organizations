@@ -8,6 +8,7 @@ import { RootState } from '../../store';
 import { LeaveRequestData } from '../../types';
 import { createLeaveRequest } from '../../services/api';
 import { Grid } from '../common/Grid';
+import notificationService from '../../services/notificationService';
 
 const leaveTypes = [
   { value: 'annual', label: 'Annual Leave' },
@@ -56,7 +57,16 @@ const LeaveRequestForm: React.FC = () => {
         totalDays: calculateTotalDays(startDate, endDate),
       };
       
-      await createLeaveRequest(formattedValues);
+      const response = await createLeaveRequest(formattedValues);
+      
+      // Emit socket event for leave request submission
+      notificationService.emitLeaveRequest({
+        employeeId: user?._id,
+        employeeName: user?.name,
+        department: user?.department,
+        leaveRequest: response
+      });
+      
       navigate('/leave/history');
     } catch (err: any) {
       if (err.errors) {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { LeaveRequest } from '../../types';
 import { getLeaveRequests, updateLeaveRequest } from '../../services/api';
+import notificationService from '../../services/notificationService';
 
 interface ActionDialogProps {
   open: boolean;
@@ -120,9 +121,22 @@ const LeaveRequests: React.FC = () => {
     if (!selectedRequest) return;
 
     try {
-      await updateLeaveRequest(selectedRequest._id, status);
+      const updatedRequest = await updateLeaveRequest(selectedRequest._id, status);
       setDialogOpen(false);
       setSelectedRequest(null);
+      
+      // Emit leave request status update notification
+      notificationService.emitLeaveRequest({
+        employeeId: selectedRequest.employee._id,
+        employeeName: selectedRequest.employee.name,
+        department: selectedRequest.employee.department,
+        status: status,
+        leaveType: selectedRequest.leaveType,
+        startDate: selectedRequest.startDate,
+        endDate: selectedRequest.endDate,
+        comment: comment
+      });
+      
       // Refresh the requests list
       fetchRequests();
     } catch (err) {

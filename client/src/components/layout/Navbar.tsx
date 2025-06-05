@@ -16,6 +16,7 @@ const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const { unreadCount } = useSelector((state: RootState) => state.notifications);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -125,9 +126,11 @@ const Navbar: React.FC = () => {
               className="p-2 rounded-lg hover:bg-white/10 transition-colors relative"
             >
               <Notifications />
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                4
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {unreadCount}
+                </span>
+              )}
             </button>
 
             <button

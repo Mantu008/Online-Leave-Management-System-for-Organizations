@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { Holiday } from '../../types';
+import notificationService from '../../services/notificationService';
 
 interface HolidayFormData {
   name: string;
@@ -58,7 +59,17 @@ const HolidayManagement: React.FC = () => {
     e.preventDefault();
     try {
       setError(null);
-      await api.post('/holidays', formData);
+      const response = await api.post('/holidays', formData);
+      
+      // Emit holiday announcement notification
+      notificationService.emitHolidayAnnouncement({
+        name: formData.name,
+        date: formData.date,
+        type: formData.type,
+        description: formData.description,
+        department: 'all' // Notify all departments
+      });
+      
       setShowAddModal(false);
       setFormData({
         name: '',
@@ -77,6 +88,17 @@ const HolidayManagement: React.FC = () => {
   const handleEditHoliday = async (holidayId: string, updatedData: Partial<Holiday>) => {
     try {
       const response = await api.patch(`/holidays/${holidayId}`, updatedData);
+      
+      // Emit holiday update notification
+      notificationService.emitHolidayAnnouncement({
+        name: updatedData.name,
+        date: updatedData.date,
+        type: updatedData.type,
+        description: updatedData.description,
+        department: 'all', // Notify all departments
+        isUpdate: true
+      });
+      
       setHolidays(holidays.map(holiday => holiday._id === holidayId ? response.data : holiday));
       setSelectedHoliday(null);
     } catch (error) {

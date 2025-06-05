@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { RootState } from './store';
+import notificationService from './services/notificationService';
 
 // Layout
 import Navbar from './components/layout/Navbar';
@@ -33,6 +34,9 @@ import TeamCalendar from './components/team/TeamCalendar';
 import Notification from './components/common/Notification';
 import NotificationsPage from './components/notifications/NotificationsPage';
 
+// User Management
+import UsersPage from './pages/users';
+
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, token } = useSelector((state: RootState) => state.auth);
@@ -46,6 +50,15 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 const App: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth);
+
+  useEffect(() => {
+    if (user) {
+      notificationService.initialize();
+    }
+    return () => {
+      notificationService.disconnect();
+    };
+  }, [user]);
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -112,11 +125,7 @@ const App: React.FC = () => {
                 path="/leave/requests"
                 element={
                   <ProtectedRoute>
-                    {user?.role === 'manager' ? (
-                      <LeaveRequests />
-                    ) : (
-                      <Navigate to="/dashboard" replace />
-                    )}
+                    <LeaveRequests />
                   </ProtectedRoute>
                 }
               />
@@ -135,11 +144,7 @@ const App: React.FC = () => {
                 path="/holidays/manage"
                 element={
                   <ProtectedRoute>
-                    {user?.role === 'admin' ? (
-                      <HolidayManagement />
-                    ) : (
-                      <Navigate to="/dashboard" replace />
-                    )}
+                    <HolidayManagement />
                   </ProtectedRoute>
                 }
               />
@@ -149,21 +154,25 @@ const App: React.FC = () => {
                 path="/team"
                 element={
                   <ProtectedRoute>
-                    {user?.role === 'manager' ? (
-                      <TeamCalendar />
-                    ) : (
-                      <Navigate to="/dashboard" replace />
-                    )}
+                    <TeamCalendar />
                   </ProtectedRoute>
                 }
               />
 
-              {/* Redirect to dashboard if logged in, otherwise to login */}
+              {/* User Management Routes */}
+              <Route
+                path="/users"
+                element={
+                  <ProtectedRoute>
+                    <UsersPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Redirect to dashboard if authenticated, otherwise to login */}
               <Route
                 path="/"
-                element={
-                  user ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
-                }
+                element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
               />
             </Routes>
           </main>

@@ -157,7 +157,7 @@ router.patch('/:id', [
   try {
     const { status, managerNote } = req.body;
     const leaveRequest = await LeaveRequest.findById(req.params.id)
-      .populate('employee', 'name email department');
+      .populate('employee', 'name email department position joiningDate');
 
     if (!leaveRequest) {
       return res.status(404).json({ message: 'Leave request not found' });
@@ -168,51 +168,90 @@ router.patch('/:id', [
       return res.status(403).json({ message: 'Not authorized to update this leave request' });
     }
 
-    leaveRequest.status = status;
-    leaveRequest.manager = req.user._id;
-    if (managerNote) leaveRequest.managerNote = managerNote;
+    // Check if leave request is already processed
+    if (leaveRequest.status !== 'pending') {
+      return res.status(400).json({ message: 'Leave request has already been processed' });
+    }
 
     // Update leave balance if approved
     if (status === 'approved') {
-      const employee = await User.findById(leaveRequest.employee);
-      employee.leaveBalance[leaveRequest.leaveType] -= leaveRequest.totalDays;
-      await employee.save();
+      const employee = await User.findById(leaveRequest.employee._id);
+      if (!employee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+
+      // Check if employee has enough leave balance
+      if (employee.leaveBalance[leaveRequest.leaveType] < leaveRequest.totalDays) {
+        return res.status(400).json({ 
+          message: `Insufficient ${leaveRequest.leaveType} leave balance. Employee has ${employee.leaveBalance[leaveRequest.leaveType]} days remaining.` 
+        });
+      }
+
+      // Update only the leave balance using findOneAndUpdate
+      await User.findOneAndUpdate(
+        { _id: leaveRequest.employee._id },
+        { 
+          $set: { 
+            [`leaveBalance.${leaveRequest.leaveType}`]: employee.leaveBalance[leaveRequest.leaveType] - leaveRequest.totalDays 
+          } 
+        },
+        { new: true }
+      );
     }
 
-    await leaveRequest.save();
+    // Update leave request using findOneAndUpdate
+    const updatedLeaveRequest = await LeaveRequest.findOneAndUpdate(
+      { _id: req.params.id },
+      { 
+        $set: { 
+          status,
+          manager: req.user._id,
+          ...(managerNote && { managerNote })
+        }
+      },
+      { 
+        new: true,
+        populate: [
+          { path: 'employee', select: 'name email' },
+          { path: 'manager', select: 'name email' }
+        ]
+      }
+    );
+
+    if (!updatedLeaveRequest) {
+      return res.status(404).json({ message: 'Leave request not found' });
+    }
+
+    // Get all managers in the department
+    const managers = await User.find({ 
+      role: 'manager', 
+      department: updatedLeaveRequest.department 
+    }).select('_id');
 
     // Emit notification to employee
     const io = req.app.get('io');
-    io.to(leaveRequest.employee._id.toString()).emit('leaveStatusUpdate', {
-      type: 'leaveStatusUpdate',
-      message: `Your leave request from ${new Date(leaveRequest.startDate).toLocaleDateString()} to ${new Date(leaveRequest.endDate).toLocaleDateString()} has been ${status}`,
-      leaveRequest: {
-        id: leaveRequest._id,
+    if (io) {
+      // Emit leave status update event
+      io.emit('leaveStatusUpdated', {
+        employeeId: updatedLeaveRequest.employee._id.toString(),
+        employeeName: updatedLeaveRequest.employee.name,
+        department: updatedLeaveRequest.department,
         status,
-        startDate: leaveRequest.startDate,
-        endDate: leaveRequest.endDate,
-        leaveType: leaveRequest.leaveType,
-        managerNote
-      }
-    });
+        managers: managers.map(m => m._id.toString()),
+        leaveRequest: {
+          id: updatedLeaveRequest._id,
+          status,
+          startDate: updatedLeaveRequest.startDate,
+          endDate: updatedLeaveRequest.endDate,
+          leaveType: updatedLeaveRequest.leaveType,
+          managerNote
+        }
+      });
+    }
 
-    // Emit notification to department
-    io.to(leaveRequest.department).emit('departmentLeaveUpdate', {
-      type: 'departmentLeaveUpdate',
-      message: `${leaveRequest.employee.name}'s leave request from ${new Date(leaveRequest.startDate).toLocaleDateString()} to ${new Date(leaveRequest.endDate).toLocaleDateString()} has been ${status}`,
-      leaveRequest: {
-        id: leaveRequest._id,
-        employee: leaveRequest.employee.name,
-        status,
-        startDate: leaveRequest.startDate,
-        endDate: leaveRequest.endDate,
-        leaveType: leaveRequest.leaveType
-      }
-    });
-
-    res.json(leaveRequest);
+    res.json(updatedLeaveRequest);
   } catch (err) {
-    console.error(err.message);
+    console.error('Update leave request error:', err);
     res.status(500).json({ message: 'Server error while updating leave request' });
   }
 });

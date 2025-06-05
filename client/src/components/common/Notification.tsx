@@ -8,6 +8,11 @@ interface Notification {
   type: string;
   message: string;
   leaveRequest?: any;
+  employeeId?: string;
+  employeeName?: string;
+  department?: string;
+  status?: string;
+  managers?: string[];
 }
 
 const Notification: React.FC = () => {
@@ -33,6 +38,11 @@ const Notification: React.FC = () => {
       socket.emit('joinDepartment', user.department);
     }
 
+    // Join manager room if user is a manager
+    if (user.role === 'manager') {
+      socket.emit('joinManager', user._id);
+    }
+
     // Listen for notifications
     socket.on('leaveStatusUpdate', (data: Notification) => {
       setNotification(data);
@@ -40,6 +50,18 @@ const Notification: React.FC = () => {
 
     socket.on('departmentLeaveUpdate', (data: Notification) => {
       if (user.role === 'manager') {
+        setNotification(data);
+      }
+    });
+
+    socket.on('managerNotification', (data: Notification) => {
+      if (user.role === 'manager') {
+        setNotification(data);
+      }
+    });
+
+    socket.on('leaveStatusUpdated', (data: Notification) => {
+      if (data.employeeId === user._id || user.role === 'manager') {
         setNotification(data);
       }
     });
@@ -64,7 +86,7 @@ const Notification: React.FC = () => {
     >
       <Alert
         onClose={handleClose}
-        severity={notification.type === 'leaveStatusUpdate' ? 'info' : 'success'}
+        severity={notification.type === 'leave' ? 'info' : 'success'}
         sx={{ width: '100%' }}
       >
         {notification.message}
