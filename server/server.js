@@ -26,6 +26,10 @@ app.use(cors({
 }));
 app.use(express.json());
 
+app.get("/", (req, res) => {
+    res.send("Hello World");
+});
+
 // Socket.io connection handling
 io.on("connection", (socket) => {
     console.log("New client connected");
