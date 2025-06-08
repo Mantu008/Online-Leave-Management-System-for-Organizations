@@ -50,7 +50,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 const App: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth);
-
+  
+  
   useEffect(() => {
     if (user) {
       notificationService.initialize();
