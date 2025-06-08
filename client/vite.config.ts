@@ -8,9 +8,10 @@ export default defineConfig({
     server: {
         proxy: {
             '/api': {
-                target: 'https://online-leave-management-system-for.vercel.app',
+                target: 'https://online-leave-management-system.vercel.app',
                 changeOrigin: true,
-                secure: true,
+                secure: false,
+                rewrite: (path) => path.replace(/^\/api/, ''),
             }
         }
     },
@@ -21,9 +22,10 @@ export default defineConfig({
     },
     build: {
         rollupOptions: {
+            external: ['html2pdf.js'],
             output: {
                 manualChunks: {
-                    'react-vendor': ['react', 'react-dom', 'react-router-dom', 'react-redux'],
+                    'react-vendor': ['react', 'react-dom', 'react-router-dom'],
                     'mui-vendor': ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
                 }
             }

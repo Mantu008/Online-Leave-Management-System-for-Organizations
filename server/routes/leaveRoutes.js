@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const LeaveRequest = require('../models/LeaveRequest');
+const User = require('../models/User');
 
 // Get all leave requests (admin only)
 router.get('/', auth, async (req, res) => {
@@ -19,10 +20,45 @@ router.get('/', auth, async (req, res) => {
 // Get my leave requests
 router.get('/my-leaves', auth, async (req, res) => {
     try {
-        const leaves = await LeaveRequest.find({ user: req.user._id });
-        res.json(leaves);
+        console.log('Fetching leaves for user:', req.user._id);
+        
+        // Find leaves for the user
+        const leaves = await LeaveRequest.find({ employee: req.user._id })
+            .populate('employee', 'name email department')
+            .sort({ createdAt: -1 });
+        
+        console.log('Found leaves:', leaves);
+
+        // Get user's leave balance with all fields
+        const user = await User.findById(req.user._id);
+        console.log('User found:', user);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Get leave balance from user document
+        const leaveBalance = {
+            casual: user.leaveBalance?.casual ?? 10,
+            sick: user.leaveBalance?.sick ?? 10,
+            annual: user.leaveBalance?.annual ?? 20
+        };
+
+        console.log('User leave balance:', leaveBalance);
+
+        // Return both leaves and leave balance
+        return res.status(200).json({
+            data: {
+                leaves: leaves || [],
+                leaveBalance: leaveBalance
+            }
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Error in /my-leaves:', error);
+        return res.status(500).json({ 
+            message: 'Error fetching leave history',
+            error: error.message 
+        });
     }
 });
 

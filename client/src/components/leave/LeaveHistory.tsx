@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { getMyLeaves } from '../../services/api';
 import { LeaveRequest } from '../../types';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { Download } from '@mui/icons-material';
 import { Button, CircularProgress, Alert } from '@mui/material';
+import axios from 'axios';
+import api from '../../services/api';
+import html2pdf from 'html2pdf.js/dist/html2pdf.bundle.min.js';
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -27,68 +28,139 @@ const LeaveHistory: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const [leaveBalance, setLeaveBalance] = useState({
+    casual: 0,
+    sick: 0,
+    annual: 0,
+  });
+
+  const fetchLeaves = async () => {
+    try {
+      // Check if user is authenticated
+      const token = sessionStorage.getItem('token');
+      if (!token) {
+        setError('Please login to view your leave history');
+        setLoading(false);
+        return;
+      }
+
+      const response = await getMyLeaves();
+      console.log('Full API Response:', response);
+      
+      // Check if response and response.data exist
+      if (!response || !response.data) {
+        throw new Error('Invalid response from server');
+      }
+
+      // Handle both array and object responses
+      let leavesData;
+      if (Array.isArray(response.data)) {
+        // If response.data is an array, we need to fetch leave balance separately
+        try {
+          const userResponse = await api.get('/auth/me');
+          const userData = userResponse.data;
+          
+          leavesData = {
+            leaves: response.data,
+            leaveBalance: {
+              casual: userData.leaveBalance?.casual ?? 10,
+              sick: userData.leaveBalance?.sick ?? 10,
+              annual: userData.leaveBalance?.annual ?? 20
+            }
+          };
+        } catch (userError) {
+          console.error('Error fetching user data:', userError);
+          leavesData = {
+            leaves: response.data,
+            leaveBalance: { casual: 10, sick: 10, annual: 20 }
+          };
+        }
+      } else {
+        // If response.data is an object, use it directly
+        leavesData = response.data;
+      }
+
+      console.log('Processed Data:', leavesData);
+      
+      // Set leaves with validation
+      if (Array.isArray(leavesData.leaves)) {
+        setLeaves(leavesData.leaves);
+      } else {
+        console.error('Invalid leaves data:', leavesData.leaves);
+        setLeaves([]);
+      }
+      
+      // Set leave balance with validation
+      if (leavesData.leaveBalance && typeof leavesData.leaveBalance === 'object') {
+        setLeaveBalance({
+          casual: leavesData.leaveBalance.casual ?? 10,
+          sick: leavesData.leaveBalance.sick ?? 10,
+          annual: leavesData.leaveBalance.annual ?? 20
+        });
+      } else {
+        console.error('Invalid leave balance data:', leavesData.leaveBalance);
+        setLeaveBalance({ casual: 10, sick: 10, annual: 20 });
+      }
+
+      setLoading(false);
+    } catch (err: any) {
+      console.error('Error fetching leaves:', err);
+      if (err.response?.status === 401) {
+        setError('Your session has expired. Please login again.');
+        // Redirect to login page after a short delay
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to fetch leave history');
+      }
+      setLoading(false);
+      setLeaves([]);
+      setLeaveBalance({ casual: 10, sick: 10, annual: 20 });
+    }
+  };
 
   useEffect(() => {
     fetchLeaves();
   }, []);
 
-  const fetchLeaves = async () => {
-    try {
-      const response = await getMyLeaves();
-      setLeaves(response.data);
-      setLoading(false);
-    } catch (err) {
-      setError('Failed to fetch leave history');
-      setLoading(false);
-    }
-  };
-
   const exportToPDF = async () => {
-    if (!user) return;
+    if (!user || !tableRef.current) return;
     
     try {
       setExporting(true);
-      const doc = new jsPDF();
       
-      // Add title
-      doc.setFontSize(20);
-      doc.text('Leave History Report', 14, 15);
-      
-      // Add user info
-      doc.setFontSize(12);
-      doc.text(`Employee: ${user.name}`, 14, 25);
-      doc.text(`Department: ${user.department}`, 14, 32);
-      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 39);
+      const element = tableRef.current;
+      const opt = {
+        margin: 1,
+        filename: 'leave-history.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      } as any;
 
-      // Add table
-      const tableData = leaves.map(leave => [
-        new Date(leave.startDate).toLocaleDateString(),
-        new Date(leave.endDate).toLocaleDateString(),
-        leave.leaveType,
-        leave.totalDays.toString(),
-        leave.status,
-        leave.reason || '-'
-      ]);
+      // Create a temporary div for the PDF content
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = `
+        <div style="padding: 20px;">
+          <h1 style="font-size: 24px; margin-bottom: 20px;">Leave History Report</h1>
+          <div style="margin-bottom: 20px;">
+            <p><strong>Employee:</strong> ${user.name}</p>
+            <p><strong>Department:</strong> ${user.department}</p>
+            <p><strong>Generated on:</strong> ${new Date().toLocaleDateString()}</p>
+          </div>
+          ${element.innerHTML}
+          <div style="margin-top: 20px;">
+            <h2 style="font-size: 18px; margin-bottom: 10px;">Leave Balance:</h2>
+            <p>Casual: ${leaveBalance?.casual || 0} days</p>
+            <p>Sick: ${leaveBalance?.sick || 0} days</p>
+            <p>Annual: ${leaveBalance?.annual || 0} days</p>
+          </div>
+        </div>
+      `;
 
-      autoTable(doc, {
-        startY: 45,
-        head: [['Start Date', 'End Date', 'Type', 'Days', 'Status', 'Reason']],
-        body: tableData,
-        theme: 'grid',
-        styles: { fontSize: 10 },
-        headStyles: { fillColor: [41, 128, 185] }
-      });
-
-      // Add leave balance
-      const finalY = (doc as any).lastAutoTable.finalY || 45;
-      doc.setFontSize(12);
-      doc.text('Leave Balance:', 14, finalY + 10);
-      doc.text(`Annual: ${user.leaveBalance.annual} days`, 14, finalY + 17);
-      doc.text(`Sick: ${user.leaveBalance.sick} days`, 14, finalY + 24);
-      doc.text(`Casual: ${user.leaveBalance.casual} days`, 14, finalY + 31);
-
-      // Save the PDF
-      doc.save('leave-history.pdf');
+      await html2pdf().set(opt).from(tempDiv).save();
     } catch (err) {
       console.error('PDF Export Error:', err);
       setError('Failed to export PDF. Please try again.');
@@ -115,9 +187,9 @@ const LeaveHistory: React.FC = () => {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold">Leave History</h1>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-800">Leave History</h1>
         <Button
           variant="contained"
           color="primary"
@@ -135,19 +207,34 @@ const LeaveHistory: React.FC = () => {
         </Alert>
       )}
 
-      <div className="bg-white rounded-lg shadow-md">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-700 mb-4">Leave Balance</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-blue-50 p-4 rounded">
+            <p className="text-sm text-gray-600">Casual Leave</p>
+            <p className="text-2xl font-bold text-blue-600">{leaveBalance?.casual || 0}</p>
+          </div>
+          <div className="bg-green-50 p-4 rounded">
+            <p className="text-sm text-gray-600">Sick Leave</p>
+            <p className="text-2xl font-bold text-green-600">{leaveBalance?.sick || 0}</p>
+          </div>
+          <div className="bg-purple-50 p-4 rounded">
+            <p className="text-sm text-gray-600">Annual Leave</p>
+            <p className="text-2xl font-bold text-purple-600">{leaveBalance?.annual || 0}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div ref={tableRef}>
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Leave Type
+                  Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Start Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  End Date
+                  Type
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Reason
@@ -155,24 +242,18 @@ const LeaveHistory: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Applied On
-                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {leaves
+              {(leaves || [])
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((leave) => (
-                  <tr key={leave._id} className="hover:bg-gray-50">
+                  <tr key={leave._id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(leave.startDate).toLocaleDateString()} - {new Date(leave.endDate).toLocaleDateString()}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {leave.leaveType}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(leave.startDate).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(leave.endDate).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {leave.reason}
@@ -181,9 +262,6 @@ const LeaveHistory: React.FC = () => {
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(leave.status)}`}>
                         {leave.status}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(leave.createdAt).toLocaleDateString()}
                     </td>
                   </tr>
                 ))}

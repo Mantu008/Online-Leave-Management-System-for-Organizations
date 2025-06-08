@@ -8,7 +8,8 @@ import {
   Title,
   Tooltip,  
   Legend,
-} from 'chart.js';
+  ChartType
+} from 'chart.js/auto';
 import { Bar } from 'react-chartjs-2';
 
 ChartJS.register(
@@ -126,6 +127,7 @@ const Dashboard: React.FC = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm">
           <h3 className="text-lg font-semibold text-gray-700 mb-4">Users by Role</h3>
           <Bar
+            type="bar"
             data={userStats}
             options={{
               responsive: true,
