@@ -3,8 +3,8 @@ import { LoginCredentials, RegisterData, AuthResponse, LeaveRequestData, LeaveRe
 import { store } from '../store';
 import { logout } from '../store/slices/authSlice';
 
-const API_URL = 'https://online-leave-management-system-for-phi.vercel.app/api';
-console.log('Using API URL:', API_URL);
+const API_URL = import.meta.env.VITE_APP_API_URL;
+console.log('API URL from env:', API_URL);
 
 const api = axios.create({
     baseURL: API_URL,
