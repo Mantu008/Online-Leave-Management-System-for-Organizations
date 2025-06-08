@@ -13,7 +13,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: process.env.CLIENT_URL || ["http://localhost:3000", "http://localhost:5173"],
+        origin: process.env.CLIENT_URL || [
+            "http://localhost:3000", 
+            "http://localhost:5173",
+            "https://online-leave-management-system-for-phi.vercel.app"
+        ],
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
         credentials: true
     },
@@ -21,7 +25,12 @@ const io = new Server(server, {
 
 // Middlewares
 app.use(cors({
-    origin: process.env.CLIENT_URL || ["http://localhost:3000", "http://localhost:5173"],
+    origin: process.env.CLIENT_URL || [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://online-leave-management-system-for-phi.vercel.app"
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true
 }));
 app.use(express.json());
