@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://online-leave-management-system-for.vercel.app/api';
+const API_BASE_URL = 'http://localhost:5000/api';
+// const API_BASE_URL = 'https://online-leave-management-system-for.vercel.app/api';
+
 
 // Get auth token
 const getAuthToken = () => {

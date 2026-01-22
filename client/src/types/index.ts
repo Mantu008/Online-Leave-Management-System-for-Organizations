@@ -4,6 +4,8 @@ export interface User {
     email: string;
     role: 'admin' | 'manager' | 'employee';
     department: string;
+    position?: string;
+    joiningDate?: string;
     leaveBalance: {
         annual: number;
         sick: number;
@@ -21,6 +23,8 @@ export interface RegisterData {
     email: string;
     password: string;
     department: string;
+    position: string;
+    joiningDate: string;
     role: string;
     leaveBalance?: {
         annual: number;

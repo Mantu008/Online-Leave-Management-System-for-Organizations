@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { User, LoginCredentials, RegisterData, AuthState } from '../../types';
-import { loginUser, registerUser, getCurrentUser } from '../../services/api';
+import { loginUser, registerUser } from '../../services/api';
 
 // Get token and user data from sessionStorage
 const token = sessionStorage.getItem('token');
@@ -13,22 +13,6 @@ const initialState: AuthState = {
     error: null,
     token: token,
 };
-
-// Initialize user data if token exists
-if (token && !storedUser) {
-    getCurrentUser()
-        .then(response => {
-            initialState.user = response;
-            sessionStorage.setItem('user', JSON.stringify(response));
-        })
-        .catch(() => {
-            sessionStorage.removeItem('token');
-            sessionStorage.removeItem('user');
-            initialState.token = null;
-            initialState.user = null;
-            initialState.isAuthenticated = false;
-        });
-}
 
 export const login = createAsyncThunk(
     'auth/login',
