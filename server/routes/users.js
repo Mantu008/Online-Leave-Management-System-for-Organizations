@@ -1,172 +1,115 @@
 const express = require('express');
-const router = express.Router();
-const auth = require('../middleware/auth');
+const { body, param } = require('express-validator');
 const User = require('../models/User');
-const bcrypt = require('bcryptjs');
+const { authenticate, authorize } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
+const { HttpError, asyncHandler } = require('../utils/http');
+const userRules = require('../validators/userRules');
+const { LEAVE_TYPES } = require('../constants');
+
+const router = express.Router();
+router.use(authenticate, authorize('admin'));
+
+const idRule = param('id').isMongoId().withMessage('Invalid user id');
 
 // @route   GET /api/users
-// @desc    Get all users (admin only)
-// @access  Private/Admin
-router.get('/', auth, async (req, res) => {
-  try {
-    // Check if user is admin
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only administrators can view all users' });
-    }
-
-    const users = await User.find().select('-password');
-    res.json(users);
-  } catch (err) {
-    console.error('Error fetching users:', err);
-    res.status(500).json({ message: 'Server error while fetching users' });
-  }
-});
+router.get(
+  '/',
+  asyncHandler(async (_req, res) => {
+    res.json(await User.find().sort({ name: 1 }));
+  })
+);
 
 // @route   GET /api/users/:id
-// @desc    Get user by ID
-// @access  Private/Admin
-router.get('/:id', auth, async (req, res) => {
-  try {
-    // Check if user is admin
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only administrators can view user details' });
-    }
-
-    const user = await User.findById(req.params.id).select('-password');
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    res.json(user);
-  } catch (err) {
-    console.error('Error fetching user:', err);
-    if (err.kind === 'ObjectId') {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    res.status(500).json({ message: 'Server error while fetching user' });
-  }
-});
-
-// @route   PUT /api/users/:id
-// @desc    Update user
-// @access  Private/Admin
-router.put('/:id', auth, async (req, res) => {
-  try {
-    // Check if user is admin
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only administrators can update users' });
-    }
-
-    const { name, email, role, department, position, joiningDate, leaveBalance } = req.body;
+router.get(
+  '/:id',
+  validate([idRule]),
+  asyncHandler(async (req, res) => {
     const user = await User.findById(req.params.id);
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Update fields
-    if (name) user.name = name;
-    if (email) user.email = email;
-    if (role) user.role = role;
-    if (department) user.department = department;
-    if (position) user.position = position;
-    if (joiningDate) user.joiningDate = joiningDate;
-    if (leaveBalance) {
-      user.leaveBalance = {
-        ...user.leaveBalance,
-        ...leaveBalance
-      };
-    }
-
-    await user.save();
+    if (!user) throw new HttpError(404, 'User not found');
     res.json(user);
-  } catch (err) {
-    console.error('Error updating user:', err);
-    res.status(500).json({ message: 'Server error while updating user' });
-  }
-});
-
-// @route   DELETE /api/users/:id
-// @desc    Delete user
-// @access  Private/Admin
-router.delete('/:id', auth, async (req, res) => {
-  try {
-    // Check if user is admin
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only administrators can delete users' });
-    }
-
-    const user = await User.findById(req.params.id);
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    await user.deleteOne();
-    res.json({ message: 'User removed successfully' });
-  } catch (err) {
-    console.error('Error deleting user:', err);
-    res.status(500).json({ message: 'Server error while deleting user' });
-  }
-});
-
-// @route   GET /api/users/department/:dept
-// @desc    Get users by department
-// @access  Private
-router.get('/department/:dept', auth, async (req, res) => {
-  try {
-    // Check if user is from the same department or is admin
-    if (req.user.role !== 'admin' && req.user.department !== req.params.dept) {
-      return res.status(403).json({ message: 'Not authorized to view users from other departments' });
-    }
-
-    const users = await User.find({ department: req.params.dept }).select('-password');
-    res.json(users);
-  } catch (err) {
-    console.error('Error fetching department users:', err);
-    res.status(500).json({ message: 'Server error while fetching department users' });
-  }
-});
+  })
+);
 
 // @route   POST /api/users
-// @desc    Create a new user (admin only)
-// @access  Private/Admin
-router.post('/', auth, async (req, res) => {
-  try {
-    // Check if user is admin
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only administrators can create users' });
+router.post(
+  '/',
+  validate([
+    userRules.name(),
+    userRules.email(),
+    userRules.password(),
+    userRules.role(),
+    userRules.department(),
+    userRules.position(),
+    userRules.joiningDate(),
+  ]),
+  asyncHandler(async (req, res) => {
+    const { name, email, password, role, department, position, joiningDate } = req.body;
+    if (await User.exists({ email })) throw new HttpError(409, 'An account with this email already exists');
+    const user = await User.create({ name, email, password, role, department, position, joiningDate });
+    res.status(201).json(user);
+  })
+);
+
+// @route   PUT /api/users/:id
+router.put(
+  '/:id',
+  validate([
+    idRule,
+    userRules.optional(userRules.name()),
+    userRules.optional(userRules.email()),
+    userRules.optional(userRules.role()),
+    userRules.optional(userRules.department()),
+    userRules.optional(userRules.position()),
+    userRules.optional(userRules.joiningDate()),
+    body('isActive').optional().isBoolean().withMessage('Active must be true or false').toBoolean(),
+    ...LEAVE_TYPES.map((type) =>
+      body(`leaveBalance.${type}`)
+        .optional()
+        .isInt({ min: 0, max: 365 })
+        .withMessage(`${type} balance must be a whole number of days`)
+        .toInt()
+    ),
+  ]),
+  asyncHandler(async (req, res) => {
+    const isSelf = String(req.user._id) === req.params.id;
+    if (isSelf && req.body.role !== undefined && req.body.role !== 'admin') {
+      throw new HttpError(400, 'You cannot remove your own administrator role');
+    }
+    if (isSelf && req.body.isActive === false) {
+      throw new HttpError(400, 'You cannot deactivate your own account');
     }
 
-    const { name, email, password, role, department } = req.body;
-
-    // Check if user already exists
-    let user = await User.findOne({ email });
-    if (user) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
-
-    // Create new user
-    user = new User({
-      name,
-      email,
-      password,
-      role,
-      department,
-      position: 'Employee', // Default position
-      joiningDate: new Date(), // Default joining date
+    const updates = {};
+    ['name', 'email', 'role', 'department', 'position', 'joiningDate', 'isActive'].forEach((field) => {
+      if (req.body[field] !== undefined) updates[field] = req.body[field];
+    });
+    LEAVE_TYPES.forEach((type) => {
+      const value = req.body.leaveBalance && req.body.leaveBalance[type];
+      if (value !== undefined) updates[`leaveBalance.${type}`] = value;
     });
 
-    await user.save();
+    if (updates.email && (await User.exists({ email: updates.email, _id: { $ne: req.params.id } }))) {
+      throw new HttpError(409, 'An account with this email already exists');
+    }
 
-    // Return user without password
-    const userResponse = user.toObject();
-    delete userResponse.password;
-    
-    res.status(201).json(userResponse);
-  } catch (err) {
-    console.error('Error creating user:', err);
-    res.status(500).json({ message: 'Server error while creating user' });
-  }
-});
+    const user = await User.findByIdAndUpdate(req.params.id, { $set: updates }, { new: true, runValidators: true });
+    if (!user) throw new HttpError(404, 'User not found');
+    res.json(user);
+  })
+);
+
+// @route   DELETE /api/users/:id
+// Leave history is kept for audit purposes; clients show it as a removed user.
+router.delete(
+  '/:id',
+  validate([idRule]),
+  asyncHandler(async (req, res) => {
+    if (String(req.user._id) === req.params.id) throw new HttpError(400, 'You cannot delete your own account');
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) throw new HttpError(404, 'User not found');
+    res.json({ message: 'User deleted' });
+  })
+);
 
 module.exports = router;

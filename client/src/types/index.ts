@@ -1,111 +1,164 @@
+export type Role = 'employee' | 'manager' | 'admin';
+export type LeaveType = 'annual' | 'sick' | 'casual';
+export type LeaveStatus = 'pending' | 'approved' | 'rejected';
+export type HolidayType = 'public' | 'company' | 'optional';
+
+export type LeaveBalance = Record<LeaveType, number>;
+
 export interface User {
-    _id: string;
-    name: string;
-    email: string;
-    role: 'admin' | 'manager' | 'employee';
-    department: string;
-    position?: string;
-    joiningDate?: string;
-    leaveBalance: {
-        annual: number;
-        sick: number;
-        casual: number;
-    };
+  _id: string;
+  name: string;
+  email: string;
+  role: Role;
+  department: string;
+  position: string;
+  joiningDate: string;
+  leaveBalance: LeaveBalance;
+  isActive: boolean;
+  lastLogin?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export interface LoginCredentials {
-    email: string;
-    password: string;
-}
-
-export interface RegisterData {
-    name: string;
-    email: string;
-    password: string;
-    department: string;
-    position: string;
-    joiningDate: string;
-    role: string;
-    leaveBalance?: {
-        annual: number;
-        sick: number;
-        casual: number;
-    };
-}
-
-export interface LeaveRequestData {
-    startDate: string;
-    endDate: string;
-    leaveType: 'annual' | 'sick' | 'casual';
-    reason: string;
+/** The populated employee on a leave request; null when the account was deleted. */
+export interface LeaveEmployee {
+  _id: string;
+  name: string;
+  email: string;
+  department?: string;
+  position?: string;
+  leaveBalance?: LeaveBalance;
 }
 
 export interface LeaveRequest {
-    _id: string;
-    employee: User;
-    leaveType: 'annual' | 'sick' | 'casual';
-    startDate: string;
-    endDate: string;
-    status: 'pending' | 'approved' | 'rejected';
-    reason: string;
-    comments?: string;
-    manager?: User;
-    managerNote?: string;
-    totalDays: number;
-    department: string;
-    createdAt: string;
-    updatedAt: string;
+  _id: string;
+  employee: LeaveEmployee | null;
+  leaveType: LeaveType;
+  startDate: string;
+  endDate: string;
+  status: LeaveStatus;
+  reason: string;
+  manager?: { _id: string; name: string; email: string } | null;
+  managerNote?: string;
+  totalDays: number;
+  department: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Holiday {
-    _id: string;
-    name: string;
-    date: string;
-    type: 'public' | 'company' | 'optional';
-    description?: string;
-    isRecurring: boolean;
-    createdAt?: string;
-    updatedAt?: string;
+  _id: string;
+  name: string;
+  date: string;
+  type: HolidayType;
+  description?: string;
+  isRecurring: boolean;
+  /** Set on recurring holidays: the date the series was created with. */
+  originalDate?: string;
+  isOccurrence?: boolean;
 }
 
-export interface AuthState {
-    user: User | null;
-    token: string | null;
-    isAuthenticated: boolean;
-    loading: boolean;
-    error: string | null;
+export interface StatusCounts {
+  pending: number;
+  approved: number;
+  rejected: number;
+  total: number;
+}
+
+export interface MonthlyPoint {
+  year: number;
+  month: number;
+  count: number;
+  approved?: number;
+  pending?: number;
+  rejected?: number;
+}
+
+export interface EmployeeStats {
+  counts: StatusCounts;
+  daysTaken: LeaveBalance;
+  monthly: MonthlyPoint[];
+  recent: LeaveRequest[];
+}
+
+export interface ManagerStats {
+  department: string;
+  teamSize: number;
+  onLeaveToday: number;
+  counts: StatusCounts;
+  monthly: MonthlyPoint[];
+}
+
+export interface DepartmentBreakdown {
+  department: string;
+  total: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+}
+
+export interface AdminStats {
+  users: Record<Role, number> & { total: number };
+  departments: number;
+  requests: StatusCounts;
+  holidaysThisMonth: number;
+  onLeaveToday: number;
+  byDepartment: DepartmentBreakdown[];
+  monthly: MonthlyPoint[];
 }
 
 export interface AuthResponse {
-    user: User;
-    token: string;
+  token: string;
+  user: User;
 }
 
-export interface LeaveState {
-    leaves: LeaveRequest[];
-    selectedLeave: LeaveRequest | null;
-    isLoading: boolean;
-    error: string | null;
+export interface LoginCredentials {
+  email: string;
+  password: string;
 }
 
-export interface HolidayState {
-    holidays: Holiday[];
-    isLoading: boolean;
-    error: string | null;
+export interface RegisterInput {
+  name: string;
+  email: string;
+  password: string;
+  department: string;
+  position: string;
+  joiningDate: string;
 }
 
-export interface LeaveUpdateData {
-    status: 'approved' | 'rejected';
-    managerNote?: string;
+export interface LeaveRequestInput {
+  startDate: string;
+  endDate: string;
+  leaveType: LeaveType;
+  reason: string;
 }
 
-export interface HolidayData {
-    name: string;
-    date: string;
-    type: 'public' | 'company';
-    description?: string;
+export interface LeaveDecision {
+  status: 'approved' | 'rejected';
+  managerNote?: string;
 }
 
-export interface RootState {
-    auth: AuthState;
-} 
+export interface HolidayInput {
+  name: string;
+  date: string;
+  type: HolidayType;
+  description: string;
+  isRecurring: boolean;
+}
+
+export interface CreateUserInput extends RegisterInput {
+  role: Role;
+}
+
+export type UpdateUserInput = Partial<Omit<CreateUserInput, 'password'>> & { isActive?: boolean };
+
+export type NotificationType = 'leave' | 'holiday' | 'user' | 'system';
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  message: string;
+  createdAt: string;
+  read: boolean;
+  data?: Record<string, unknown>;
+}

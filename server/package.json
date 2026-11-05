@@ -7,7 +7,9 @@
     "scripts": {
         "start": "node server.js",
         "dev": "nodemon server.js",
-        "vercel-build": "echo 'Building...'"
+        "test": "node --test --test-concurrency=1 \"tests/**/*.test.js\"",
+        "create-admin": "node scripts/createAdmin.js",
+        "vercel-build": "echo \"No build step\""
     },
     "dependencies": {
         "bcryptjs": "^2.4.3",
@@ -17,10 +19,13 @@
         "express-validator": "^7.0.1",
         "jsonwebtoken": "^9.0.2",
         "mongoose": "^8.0.0",
-        "nodemailer": "^6.10.1",
+        "nodemailer": "^10.3.1",
         "socket.io": "^4.7.2"
     },
     "devDependencies": {
         "nodemon": "^3.0.1"
+    },
+    "engines": {
+        "node": ">=18"
     }
 }

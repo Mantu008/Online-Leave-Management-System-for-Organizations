@@ -1,59 +1,42 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { HttpError, asyncHandler } = require('../utils/http');
 
-const auth = async (req, res, next) => {
-    try {
-        const token = req.header('Authorization')?.replace('Bearer ', '');
-        console.log('Received token:', token ? 'Present' : 'Missing'); // Debug log
-        
-        if (!token) {
-            return res.status(401).json({ message: 'No authentication token provided' });
-        }
+const TOKEN_TTL = '24h';
 
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            console.log('Decoded token:', decoded); // Debug log
+function signToken(user) {
+  return jwt.sign({ userId: String(user._id) }, process.env.JWT_SECRET, { expiresIn: TOKEN_TTL });
+}
 
-            const user = await User.findById(decoded.userId);
-            console.log('Found user:', user ? { id: user._id, role: user.role } : 'Not found'); // Debug log
+/** Resolve a bearer token to an active user document, or throw a 401. */
+async function userFromToken(token) {
+  let payload;
+  try {
+    payload = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    throw new HttpError(401, err.name === 'TokenExpiredError' ? 'Your session has expired' : 'Invalid session');
+  }
+  const user = payload && payload.userId ? await User.findById(payload.userId) : null;
+  if (!user) throw new HttpError(401, 'Invalid session');
+  if (!user.isActive) throw new HttpError(401, 'This account has been deactivated');
+  return user;
+}
 
-            if (!user) {
-                console.log('User not found in database'); // Debug log
-                return res.status(401).json({ message: 'User not found' });
-            }
+/** Requires a valid `Authorization: Bearer <token>` header; sets req.user. */
+const authenticate = asyncHandler(async (req, _res, next) => {
+  const header = req.headers.authorization || '';
+  const [scheme, token] = header.split(' ');
+  if (scheme !== 'Bearer' || !token) throw new HttpError(401, 'Authentication required');
+  req.user = await userFromToken(token);
+  next();
+});
 
-            // Add user info to request
-            req.user = user;
-            req.token = token;
-
-            // Role and department checks are now optional and only used for additional validation
-            const requiredRole = req.header('X-User-Role');
-            if (requiredRole && user.role !== requiredRole) {
-                console.log(`Role mismatch: Required ${requiredRole}, User has ${user.role}`); // Debug log
-                return res.status(403).json({ message: `User role ${user.role} is not authorized to access this route` });
-            }
-
-            const requiredDepartment = req.header('X-User-Department');
-            if (requiredDepartment && user.department !== requiredDepartment) {
-                console.log(`Department mismatch: Required ${requiredDepartment}, User has ${user.department}`); // Debug log
-                return res.status(403).json({ message: `User department ${user.department} is not authorized to access this department's data` });
-            }
-
-            next();
-        } catch (jwtError) {
-            console.error('JWT verification error:', jwtError); // Debug log
-            if (jwtError.name === 'JsonWebTokenError') {
-                return res.status(401).json({ message: 'Invalid authentication token' });
-            }
-            if (jwtError.name === 'TokenExpiredError') {
-                return res.status(401).json({ message: 'Authentication token has expired' });
-            }
-            throw jwtError;
-        }
-    } catch (error) {
-        console.error('Auth middleware error:', error); // Debug log
-        res.status(401).json({ message: 'Authentication failed' });
-    }
+/** Restricts a route to the given roles. Use after `authenticate`. */
+const authorize = (...roles) => (req, _res, next) => {
+  if (!req.user || !roles.includes(req.user.role)) {
+    return next(new HttpError(403, 'You do not have permission to perform this action'));
+  }
+  return next();
 };
 
-module.exports = auth; 
+module.exports = { authenticate, authorize, signToken, userFromToken };

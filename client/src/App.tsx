@@ -1,219 +1,84 @@
-import React, { useEffect } from "react";
-import {
-    BrowserRouter as Router,
-    Routes,
-    Route,
-    Navigate,
-} from "react-router-dom";
-import { useSelector } from "react-redux";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import { RootState } from "./store";
-import notificationService from "./services/notificationService";
+import { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { useSnackbar } from 'notistack';
+import { useAppDispatch, useAppSelector } from './store';
+import { refreshUser } from './store/slices/authSlice';
+import { addNotification } from './store/slices/notificationSlice';
+import { connectRealtime } from './services/realtime';
+import { AppShell } from './components/layout/AppShell';
+import { GuestOnly, RequireAuth, RoleGate } from './components/layout/Guards';
+import { LoadingState } from './components/ui/Feedback';
 
-// Layout
-import Navbar from "./components/layout/Navbar";
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
+const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
+const ApplyLeavePage = lazy(() => import('./pages/leave/ApplyLeavePage'));
+const LeaveHistoryPage = lazy(() => import('./pages/leave/LeaveHistoryPage'));
+const LeaveRequestsPage = lazy(() => import('./pages/leave/LeaveRequestsPage'));
+const TeamCalendarPage = lazy(() => import('./pages/team/TeamCalendarPage'));
+const HolidaysPage = lazy(() => import('./pages/holidays/HolidaysPage'));
+const ManageHolidaysPage = lazy(() => import('./pages/holidays/ManageHolidaysPage'));
+const UsersPage = lazy(() => import('./pages/users/UsersPage'));
+const NotificationsPage = lazy(() => import('./pages/notifications/NotificationsPage'));
+const ProfilePage = lazy(() => import('./pages/profile/ProfilePage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
-// Auth Components
-import LoginForm from "./components/auth/LoginForm";
-import RegisterForm from "./components/auth/RegisterForm";
+/** Keeps the signed-in user fresh and relays realtime notifications into the store. */
+function SessionSync() {
+  const token = useAppSelector((s) => s.auth.token);
+  const dispatch = useAppDispatch();
+  const { enqueueSnackbar } = useSnackbar();
 
-// Leave Components
-import LeaveRequestForm from "./components/leave/LeaveRequestForm";
-import LeaveHistory from "./components/leave/LeaveHistory";
-import LeaveRequests from "./components/leave/LeaveRequests";
+  // Role, department and leave balance can change server-side since sign-in.
+  useEffect(() => {
+    if (token) dispatch(refreshUser());
+  }, [token, dispatch]);
 
-// Holiday Components
-import HolidayCalendar from "./components/holiday/HolidayCalendar";
-import HolidayManagement from "./components/admin/HolidayManagement";
+  useEffect(() => {
+    if (!token) return undefined;
+    return connectRealtime(token, (notification) => {
+      dispatch(addNotification(notification));
+      enqueueSnackbar(notification.message, { variant: 'info' });
+      // A decision on the user's own leave changes their balance.
+      if (notification.type === 'leave' && notification.data?.status) dispatch(refreshUser());
+    });
+  }, [token, dispatch, enqueueSnackbar]);
 
-// Dashboard Components
-import EmployeeDashboard from "./components/dashboard/EmployeeDashboard";
-import ManagerDashboard from "./components/dashboard/ManagerDashboard";
-import AdminDashboard from "./components/dashboard/AdminDashboard";
+  return null;
+}
 
-// Team Components
-import TeamCalendar from "./components/team/TeamCalendar";
+const gate = (roles: Parameters<typeof RoleGate>[0]['roles'], element: JSX.Element) => <RoleGate roles={roles}>{element}</RoleGate>;
 
-// Notification Components
-import Notification from "./components/common/Notification";
-import NotificationsPage from "./components/notifications/NotificationsPage";
-import ProfilePage from "./pages/profile";
+export default function App() {
+  return (
+    <BrowserRouter>
+      <SessionSync />
+      <Suspense fallback={<LoadingState className="min-h-screen" />}>
+        <Routes>
+          <Route element={<GuestOnly />}>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+          </Route>
 
-// User Management
-import UsersPage from "./pages/users";
+          <Route element={<RequireAuth />}>
+            <Route element={<AppShell />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/leave/apply" element={gate(['employee'], <ApplyLeavePage />)} />
+              <Route path="/leave/history" element={gate(['employee'], <LeaveHistoryPage />)} />
+              <Route path="/leave/requests" element={gate(['manager'], <LeaveRequestsPage />)} />
+              <Route path="/team" element={gate(['manager'], <TeamCalendarPage />)} />
+              <Route path="/holidays" element={<HolidaysPage />} />
+              <Route path="/holidays/manage" element={gate(['admin'], <ManageHolidaysPage />)} />
+              <Route path="/users" element={gate(['admin'], <UsersPage />)} />
+              <Route path="/notifications" element={<NotificationsPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
+          </Route>
 
-// Protected Route Component
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
-    children,
-}) => {
-    const { user, token } = useSelector((state: RootState) => state.auth);
-
-    if (!user || !token) {
-        return <Navigate to="/login" replace />;
-    }
-
-    return <>{children}</>;
-};
-
-const App: React.FC = () => {
-    const { user } = useSelector((state: RootState) => state.auth);
-
-    useEffect(() => {
-        if (user) {
-            notificationService.initialize();
-        }
-        return () => {
-            notificationService.disconnect();
-        };
-    }, [user]);
-
-    return (
-        <LocalizationProvider dateAdapter={AdapterDateFns}>
-            <Router>
-                <div className="min-h-screen bg-gray-50">
-                    <Navbar />
-                    <Notification />
-                    <main className="container mx-auto px-4 py-8">
-                        <Routes>
-                            {/* Public Routes */}
-                            <Route
-                                path="/login"
-                                element={
-                                    user ? (
-                                        <Navigate to="/dashboard" replace />
-                                    ) : (
-                                        <LoginForm />
-                                    )
-                                }
-                            />
-                            <Route
-                                path="/register"
-                                element={
-                                    user ? (
-                                        <Navigate to="/dashboard" replace />
-                                    ) : (
-                                        <RegisterForm />
-                                    )
-                                }
-                            />
-
-                            {/* Protected Routes */}
-                            <Route
-                                path="/dashboard"
-                                element={
-                                    <ProtectedRoute>
-                                        {user?.role === "manager" ? (
-                                            <ManagerDashboard />
-                                        ) : user?.role === "admin" ? (
-                                            <AdminDashboard />
-                                        ) : (
-                                            <EmployeeDashboard />
-                                        )}
-                                    </ProtectedRoute>
-                                }
-                            />
-
-                            <Route
-                                path="/notifications"
-                                element={
-                                    <ProtectedRoute>
-                                        <NotificationsPage />
-                                    </ProtectedRoute>
-                                }
-                            />
-
-                            <Route
-                                path="/profile"
-                                element={
-                                    <ProtectedRoute>
-                                        <ProfilePage />
-                                    </ProtectedRoute>
-                                }
-                            />
-
-                            <Route
-                                path="/leave/apply"
-                                element={
-                                    <ProtectedRoute>
-                                        <LeaveRequestForm />
-                                    </ProtectedRoute>
-                                }
-                            />
-
-                            <Route
-                                path="/leave/history"
-                                element={
-                                    <ProtectedRoute>
-                                        <LeaveHistory />
-                                    </ProtectedRoute>
-                                }
-                            />
-
-                            <Route
-                                path="/leave/requests"
-                                element={
-                                    <ProtectedRoute>
-                                        <LeaveRequests />
-                                    </ProtectedRoute>
-                                }
-                            />
-
-                            {/* Holiday Routes */}
-                            <Route
-                                path="/holidays"
-                                element={
-                                    <ProtectedRoute>
-                                        <HolidayCalendar />
-                                    </ProtectedRoute>
-                                }
-                            />
-
-                            <Route
-                                path="/holidays/manage"
-                                element={
-                                    <ProtectedRoute>
-                                        <HolidayManagement />
-                                    </ProtectedRoute>
-                                }
-                            />
-
-                            {/* Team Routes */}
-                            <Route
-                                path="/team"
-                                element={
-                                    <ProtectedRoute>
-                                        <TeamCalendar />
-                                    </ProtectedRoute>
-                                }
-                            />
-
-                            {/* User Management Routes */}
-                            <Route
-                                path="/users"
-                                element={
-                                    <ProtectedRoute>
-                                        <UsersPage />
-                                    </ProtectedRoute>
-                                }
-                            />
-
-                            {/* Redirect to dashboard if authenticated, otherwise to login */}
-                            <Route
-                                path="/"
-                                element={
-                                    <Navigate
-                                        to={user ? "/dashboard" : "/login"}
-                                        replace
-                                    />
-                                }
-                            />
-                        </Routes>
-                    </main>
-                </div>
-            </Router>
-        </LocalizationProvider>
-    );
-};
-
-export default App;
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  );
+}

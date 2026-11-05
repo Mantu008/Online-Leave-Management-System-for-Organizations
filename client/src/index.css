@@ -3,86 +3,57 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
-    @apply bg-gray-50;
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-      sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    @apply bg-slate-50 font-sans text-sm text-slate-900 antialiased;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-600 ring-offset-2 ring-offset-white;
+  }
+
+  /* Native date pickers inherit the form text colour. */
+  input[type='date']::-webkit-calendar-picker-indicator {
+    @apply cursor-pointer opacity-60;
+  }
+
+  dialog::backdrop {
+    background: rgb(15 23 42 / 0.45);
   }
 }
 
 @layer components {
-  .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
-  }
-  
-  .btn-primary {
-    @apply bg-primary-main text-white hover:bg-primary-dark;
-  }
-  
-  .btn-secondary {
-    @apply bg-secondary-main text-white hover:bg-secondary-dark;
-  }
-  
-  .card {
-    @apply bg-white rounded-xl shadow-md p-6;
-  }
-  
-  .input {
-    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-main focus:border-transparent;
+  .control {
+    @apply block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm
+      placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20
+      disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500;
   }
 
-  /* Chart container styles */
-  .chart-container {
-    @apply relative w-full h-full;
-  }
-
-  /* Dashboard card hover effects */
-  .dashboard-card {
-    @apply bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-all duration-200 hover:-translate-y-1;
-  }
-
-  /* Stat card styles */
-  .stat-card {
-    @apply bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-all duration-200;
-  }
-
-  /* Progress bar styles */
-  .progress-bar {
-    @apply w-full bg-gray-200 rounded-full h-2;
-  }
-
-  .progress-fill {
-    @apply h-2 rounded-full transition-all duration-300;
-  }
-
-  /* Status badge styles */
-  .status-badge {
-    @apply px-2 py-1 text-xs font-medium rounded-full;
-  }
-
-  .status-approved {
-    @apply bg-green-100 text-green-800;
-  }
-
-  .status-pending {
-    @apply bg-orange-100 text-orange-800;
-  }
-
-  .status-rejected {
-    @apply bg-red-100 text-red-800;
-  }
-
-  /* Loading spinner */
-  .loading-spinner {
-    @apply animate-spin rounded-full h-8 w-8 border-b-2 border-primary-main;
+  .control-invalid {
+    @apply border-rose-400 focus:border-rose-500 focus:ring-rose-500/20;
   }
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Doubled class selectors outrank the styles notistack injects at runtime. */
+/* Toasts (notistack): match the application palette instead of the library's stock colours. */
+.notistack-MuiContent.notistack-MuiContent {
+  @apply rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg;
+}
+.notistack-MuiContent.notistack-MuiContent-success {
+  @apply bg-emerald-700;
+}
+.notistack-MuiContent.notistack-MuiContent-error {
+  @apply bg-rose-700;
 }

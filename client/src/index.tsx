@@ -1,32 +1,24 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
-import { ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
 import { SnackbarProvider } from 'notistack';
 import { store } from './store';
-import theme from './theme';
+import { sessionExpired } from './store/slices/authSlice';
+import { configureHttp } from './services/http';
+import App from './App';
 import './index.css';
-import App from './App.jsx';
-import reportWebVitals from './reportWebVitals';
 
-const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement
-);
-root.render(
+configureHttp({
+  getToken: () => store.getState().auth.token,
+  onSessionExpired: (message) => store.dispatch(sessionExpired(message)),
+});
+
+ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <Provider store={store}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <SnackbarProvider maxSnack={3}>
-          <App />
-        </SnackbarProvider>
-      </ThemeProvider>
+      <SnackbarProvider maxSnack={3} autoHideDuration={5000} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+        <App />
+      </SnackbarProvider>
     </Provider>
   </React.StrictMode>
 );
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();

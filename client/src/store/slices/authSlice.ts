@@ -1,113 +1,105 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { User, LoginCredentials, RegisterData, AuthState } from '../../types';
-import { loginUser, registerUser } from '../../services/api';
+import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { authApi } from '../../services/api';
+import { errorMessage } from '../../services/http';
+import type { LoginCredentials, RegisterInput, User } from '../../types';
 
-// Get token and user data from sessionStorage
-const token = sessionStorage.getItem('token');
-const storedUser = sessionStorage.getItem('user');
+export interface AuthState {
+  user: User | null;
+  token: string | null;
+  /** True while a login or registration request is in flight. */
+  submitting: boolean;
+  error: string | null;
+  /** Explains why the user was signed out (e.g. expired session). */
+  notice: string | null;
+}
 
-const initialState: AuthState = {
-    user: storedUser ? JSON.parse(storedUser) : null,
-    isAuthenticated: !!token,
-    loading: false,
-    error: null,
-    token: token,
-};
+export const STORAGE_KEYS = { token: 'token', user: 'user' } as const;
 
-export const login = createAsyncThunk(
-    'auth/login',
-    async (credentials: LoginCredentials, { rejectWithValue }) => {
-        try {
-            const data = await loginUser(credentials);
-            sessionStorage.setItem('token', data.token);
-            sessionStorage.setItem('user', JSON.stringify(data.user));
-            return data;
-        } catch (error: any) {
-            return rejectWithValue(error.message || 'Login failed');
-        }
-    }
-);
+function readStoredSession(): Pick<AuthState, 'user' | 'token'> {
+  try {
+    const token = sessionStorage.getItem(STORAGE_KEYS.token);
+    const user = sessionStorage.getItem(STORAGE_KEYS.user);
+    return token && user ? { token, user: JSON.parse(user) as User } : { token: null, user: null };
+  } catch {
+    return { token: null, user: null };
+  }
+}
 
-export const register = createAsyncThunk(
-    'auth/register',
-    async (userData: RegisterData, { rejectWithValue }) => {
-        try {
-            const data = await registerUser(userData);
-            sessionStorage.setItem('token', data.token);
-            sessionStorage.setItem('user', JSON.stringify(data.user));
-            return data;
-        } catch (error: any) {
-            return rejectWithValue(error.message || 'Registration failed');
-        }
-    }
-);
-
-const authSlice = createSlice({
-    name: 'auth',
-    initialState,
-    reducers: {
-        logout: (state) => {
-            state.user = null;
-            state.token = null;
-            state.isAuthenticated = false;
-            state.error = null;
-            sessionStorage.removeItem('token');
-            sessionStorage.removeItem('user');
-        },
-        clearError: (state) => {
-            state.error = null;
-        },
-        updateUser: (state, action: PayloadAction<User>) => {
-            state.user = action.payload;
-            sessionStorage.setItem('user', JSON.stringify(action.payload));
-        },
-    },
-    extraReducers: (builder) => {
-        builder
-            // Login
-            .addCase(login.pending, (state) => {
-                state.loading = true;
-                state.error = null;
-            })
-            .addCase(login.fulfilled, (state, action) => {
-                state.loading = false;
-                state.user = action.payload.user;
-                state.token = action.payload.token;
-                state.isAuthenticated = true;
-                state.error = null;
-            })
-            .addCase(login.rejected, (state, action) => {
-                state.loading = false;
-                state.error = action.payload as string;
-                state.isAuthenticated = false;
-                state.token = null;
-                state.user = null;
-                sessionStorage.removeItem('token');
-                sessionStorage.removeItem('user');
-            })
-            // Register
-            .addCase(register.pending, (state) => {
-                state.loading = true;
-                state.error = null;
-            })
-            .addCase(register.fulfilled, (state, action) => {
-                state.loading = false;
-                state.user = action.payload.user;
-                state.token = action.payload.token;
-                state.isAuthenticated = true;
-                state.error = null;
-            })
-            .addCase(register.rejected, (state, action) => {
-                state.loading = false;
-                state.error = action.payload as string;
-                state.isAuthenticated = false;
-                state.token = null;
-                state.user = null;
-                sessionStorage.removeItem('token');
-                sessionStorage.removeItem('user');
-            });
-    },
+export const initialAuthState = (): AuthState => ({
+  ...readStoredSession(),
+  submitting: false,
+  error: null,
+  notice: null,
 });
 
-export const { logout, clearError, updateUser } = authSlice.actions;
-export default authSlice.reducer; 
+export const login = createAsyncThunk('auth/login', async (credentials: LoginCredentials, { rejectWithValue }) => {
+  try {
+    return await authApi.login(credentials);
+  } catch (error) {
+    return rejectWithValue(errorMessage(error, 'Sign in failed'));
+  }
+});
+
+export const register = createAsyncThunk('auth/register', async (input: RegisterInput, { rejectWithValue }) => {
+  try {
+    return await authApi.register(input);
+  } catch (error) {
+    return rejectWithValue(errorMessage(error, 'Registration failed'));
+  }
+});
+
+/** Re-reads the signed-in user (role, department and leave balance can change server-side). */
+export const refreshUser = createAsyncThunk('auth/refreshUser', () => authApi.me());
+
+const authSlice = createSlice({
+  name: 'auth',
+  initialState: initialAuthState,
+  reducers: {
+    logout: (state) => {
+      state.user = null;
+      state.token = null;
+      state.error = null;
+      state.notice = null;
+    },
+    sessionExpired: (state, action: PayloadAction<string>) => {
+      if (!state.token) return;
+      state.user = null;
+      state.token = null;
+      state.notice = `${action.payload}. Please sign in again.`;
+    },
+    clearAuthMessages: (state) => {
+      state.error = null;
+      state.notice = null;
+    },
+  },
+  extraReducers: (builder) => {
+    const pending = (state: AuthState) => {
+      state.submitting = true;
+      state.error = null;
+      state.notice = null;
+    };
+    const fulfilled = (state: AuthState, action: PayloadAction<{ user: User; token: string }>) => {
+      state.submitting = false;
+      state.user = action.payload.user;
+      state.token = action.payload.token;
+    };
+    const rejected = (state: AuthState, action: { payload?: unknown }) => {
+      state.submitting = false;
+      state.error = typeof action.payload === 'string' ? action.payload : 'Something went wrong';
+    };
+
+    builder
+      .addCase(login.pending, pending)
+      .addCase(login.fulfilled, fulfilled)
+      .addCase(login.rejected, rejected)
+      .addCase(register.pending, pending)
+      .addCase(register.fulfilled, fulfilled)
+      .addCase(register.rejected, rejected)
+      .addCase(refreshUser.fulfilled, (state, action) => {
+        if (state.token) state.user = action.payload;
+      });
+  },
+});
+
+export const { logout, sessionExpired, clearAuthMessages } = authSlice.actions;
+export default authSlice.reducer;

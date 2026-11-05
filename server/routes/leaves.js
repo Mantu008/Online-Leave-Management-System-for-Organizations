@@ -1,428 +1,256 @@
 const express = require('express');
-const router = express.Router();
-const { body, validationResult } = require('express-validator');
-const auth = require('../middleware/auth');
+const { body, param, query } = require('express-validator');
 const LeaveRequest = require('../models/LeaveRequest');
-const Holiday = require('../models/Holiday');
 const User = require('../models/User');
+const { authenticate, authorize } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
+const { HttpError, asyncHandler } = require('../utils/http');
+const {
+  parseDateOnly,
+  startOfUtcDay,
+  addDays,
+  countDaysInclusive,
+  monthWindowStart,
+  buildMonthlySeries,
+} = require('../utils/dates');
+const { LEAVE_TYPES, LEAVE_STATUSES } = require('../constants');
+const { findHolidaysInRange } = require('../services/holidays');
+const notifications = require('../services/notifications');
+
+const router = express.Router();
+router.use(authenticate);
+
+const EMPLOYEE_FIELDS = 'name email department position';
+
+const dateOnly = (field, label) =>
+  body(field)
+    .custom((value) => parseDateOnly(value) !== null)
+    .withMessage(`${label} must be a valid date (YYYY-MM-DD)`);
+
+const countByStatus = (rows) => {
+  const counts = { pending: 0, approved: 0, rejected: 0 };
+  rows.forEach((row) => {
+    counts[row._id] = row.count;
+  });
+  return { ...counts, total: counts.pending + counts.approved + counts.rejected };
+};
+
+const monthlyPipeline = (match, months) => [
+  { $match: { ...match, createdAt: { $gte: monthWindowStart(months) } } },
+  {
+    $group: {
+      _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+      count: { $sum: 1 },
+    },
+  },
+];
 
 // @route   POST /api/leaves
-// @desc    Create a leave request
-// @access  Private (Employee)
-router.post('/', [
-  auth,
-  body('startDate')
-    .matches(/^\d{4}-\d{2}-\d{2}$/)
-    .withMessage('Start date must be in YYYY-MM-DD format'),
-  body('endDate')
-    .matches(/^\d{4}-\d{2}-\d{2}$/)
-    .withMessage('End date must be in YYYY-MM-DD format'),
-  body('leaveType').isIn(['annual', 'sick', 'casual']).withMessage('Invalid leave type'),
-  body('reason').notEmpty().withMessage('Reason is required'),
-  body('totalDays').isInt({ min: 1 }).withMessage('Total days must be a positive number')
-], async (req, res) => {
-  // Check if user is an employee
-  if (req.user.role !== 'employee') {
-    return res.status(403).json({ message: 'Only employees can create leave requests' });
-  }
+// @access  Employee
+router.post(
+  '/',
+  authorize('employee'),
+  validate([
+    dateOnly('startDate', 'Start date'),
+    dateOnly('endDate', 'End date'),
+    body('leaveType').isIn(LEAVE_TYPES).withMessage('Choose a valid leave type'),
+    body('reason')
+      .isString()
+      .withMessage('Reason is required')
+      .bail()
+      .trim()
+      .isLength({ min: 10, max: 1000 })
+      .withMessage('Reason must be between 10 and 1000 characters'),
+  ]),
+  asyncHandler(async (req, res) => {
+    const { leaveType, reason } = req.body;
+    const start = parseDateOnly(req.body.startDate);
+    const end = parseDateOnly(req.body.endDate);
+    const employee = req.user;
 
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
+    if (end < start) throw new HttpError(400, 'End date must be on or after the start date');
 
-  try {
-    const { startDate, endDate, leaveType, reason, totalDays } = req.body;
-    
-    // Check if dates are valid
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    if (end < start) {
-      return res.status(400).json({ message: 'End date must be after start date' });
+    // One day of slack so a user whose local date is ahead of UTC can still
+    // request leave starting "today".
+    if (start < addDays(startOfUtcDay(), -1)) {
+      throw new HttpError(400, 'Start date cannot be in the past');
     }
 
-    // Check for holidays
-    const holidays = await Holiday.find({
-      date: {
-        $gte: start,
-        $lte: end
-      }
-    });
-
+    const holidays = await findHolidaysInRange(start, end);
     if (holidays.length > 0) {
-      return res.status(400).json({
-        message: 'Leave request overlaps with holidays',
-        holidays
-      });
+      const names = holidays.map((h) => h.name).join(', ');
+      throw new HttpError(400, `The selected dates include a holiday (${names}). Adjust your dates around it.`);
     }
 
-    // Check leave balance
-    const user = await User.findById(req.user._id);
-    if (user.leaveBalance[leaveType] < totalDays) {
-      return res.status(400).json({ 
-        message: `Insufficient ${leaveType} leave balance. You have ${user.leaveBalance[leaveType]} days remaining.` 
-      });
-    }
-
-    // Create leave request
-    const leaveRequest = new LeaveRequest({
-      employee: req.user._id,
-      startDate,
-      endDate,
-      leaveType,
-      reason,
-      totalDays,
-      department: user.department
+    const overlapping = await LeaveRequest.exists({
+      employee: employee._id,
+      status: { $in: ['pending', 'approved'] },
+      startDate: { $lte: end },
+      endDate: { $gte: start },
     });
-
-    await leaveRequest.save();
-
-    res.json(leaveRequest);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ message: 'Server error while creating leave request' });
-  }
-});
-
-// @route   GET /api/leaves
-// @desc    Get all leave requests (filtered by role)
-// @access  Private
-router.get('/', auth, async (req, res) => {
-  try {
-    let leaves;
-    
-    if (req.user.role === 'admin') {
-      // Admin can see all leaves
-      leaves = await LeaveRequest.find()
-        .populate('employee', 'name email')
-        .populate('manager', 'name email')
-        .sort({ createdAt: -1 });
-    } else if (req.user.role === 'manager') {
-      // Manager can see department leaves
-      leaves = await LeaveRequest.find({ department: req.user.department })
-        .populate('employee', 'name email')
-        .populate('manager', 'name email')
-        .sort({ createdAt: -1 });
-    } else {
-      // Employee can see their own leaves
-      leaves = await LeaveRequest.find({ employee: req.user._id })
-        .populate('employee', 'name email')
-        .populate('manager', 'name email')
-        .sort({ createdAt: -1 });
+    if (overlapping) {
+      throw new HttpError(409, 'You already have a pending or approved request that overlaps these dates');
     }
 
-    res.json(leaves);
-  } catch (err) {
-    console.error('Get leaves error:', err);
-    res.status(500).json({ message: 'Server error while fetching leaves' });
-  }
-});
-
-// @route   GET /api/leaves/department
-// @desc    Get all leave requests for a department
-// @access  Private (Manager)
-router.get('/department', auth, async (req, res) => {
-  try {
-    if (req.user.role !== 'manager') {
-      return res.status(403).json({ message: 'Only managers can view department leaves' });
-    }
-
-    const leaves = await LeaveRequest.find({ department: req.user.department })
-      .populate('employee', 'name email')
-      .sort({ createdAt: -1 });
-    res.json(leaves);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ message: 'Server error while fetching department leaves' });
-  }
-});
-
-// @route   PATCH /api/leaves/:id
-// @desc    Update leave request status
-// @access  Private (Manager)
-router.patch('/:id', [
-  auth,
-  body('status').isIn(['approved', 'rejected']).withMessage('Invalid status'),
-  body('managerNote').optional()
-], async (req, res) => {
-  if (req.user.role !== 'manager') {
-    return res.status(403).json({ message: 'Only managers can update leave requests' });
-  }
-
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
-  try {
-    const { status, managerNote } = req.body;
-    const leaveRequest = await LeaveRequest.findById(req.params.id)
-      .populate('employee', 'name email department position joiningDate');
-
-    if (!leaveRequest) {
-      return res.status(404).json({ message: 'Leave request not found' });
-    }
-
-    // Check if manager is from same department
-    if (leaveRequest.department !== req.user.department) {
-      return res.status(403).json({ message: 'Not authorized to update this leave request' });
-    }
-
-    // Check if leave request is already processed
-    if (leaveRequest.status !== 'pending') {
-      return res.status(400).json({ message: 'Leave request has already been processed' });
-    }
-
-    // Update leave balance if approved
-    if (status === 'approved') {
-      const employee = await User.findById(leaveRequest.employee._id);
-      if (!employee) {
-        return res.status(404).json({ message: 'Employee not found' });
-      }
-
-      // Check if employee has enough leave balance
-      if (employee.leaveBalance[leaveRequest.leaveType] < leaveRequest.totalDays) {
-        return res.status(400).json({ 
-          message: `Insufficient ${leaveRequest.leaveType} leave balance. Employee has ${employee.leaveBalance[leaveRequest.leaveType]} days remaining.` 
-        });
-      }
-
-      // Update only the leave balance using findOneAndUpdate
-      await User.findOneAndUpdate(
-        { _id: leaveRequest.employee._id },
-        { 
-          $set: { 
-            [`leaveBalance.${leaveRequest.leaveType}`]: employee.leaveBalance[leaveRequest.leaveType] - leaveRequest.totalDays 
-          } 
-        },
-        { new: true }
+    const totalDays = countDaysInclusive(start, end);
+    const available = employee.leaveBalance[leaveType];
+    if (available < totalDays) {
+      throw new HttpError(
+        400,
+        `Not enough ${leaveType} leave: ${totalDays} day${totalDays === 1 ? '' : 's'} requested, ${available} available`
       );
     }
 
-    // Update leave request using findOneAndUpdate
-    const updatedLeaveRequest = await LeaveRequest.findOneAndUpdate(
-      { _id: req.params.id },
-      { 
-        $set: { 
-          status,
-          manager: req.user._id,
-          ...(managerNote && { managerNote })
-        }
-      },
-      { 
-        new: true,
-        populate: [
-          { path: 'employee', select: 'name email' },
-          { path: 'manager', select: 'name email' }
-        ]
-      }
-    );
+    const leave = await LeaveRequest.create({
+      employee: employee._id,
+      leaveType,
+      reason,
+      startDate: start,
+      endDate: end,
+      totalDays,
+      department: employee.department,
+    });
 
-    if (!updatedLeaveRequest) {
-      return res.status(404).json({ message: 'Leave request not found' });
-    }
+    notifications.leaveSubmitted(req.app, leave, employee);
+    await leave.populate('employee', EMPLOYEE_FIELDS);
+    res.status(201).json(leave);
+  })
+);
 
-    // Get all managers in the department
-    const managers = await User.find({ 
-      role: 'manager', 
-      department: updatedLeaveRequest.department 
-    }).select('_id');
+// @route   GET /api/leaves?status=pending
+// @desc    Employees see their own requests, managers their department's,
+//          admins everyone's.
+router.get(
+  '/',
+  validate([query('status').optional().isIn(LEAVE_STATUSES).withMessage('Invalid status filter')]),
+  asyncHandler(async (req, res) => {
+    const filter = {};
+    if (req.user.role === 'employee') filter.employee = req.user._id;
+    if (req.user.role === 'manager') filter.department = req.user.department;
+    if (req.query.status) filter.status = req.query.status;
 
-    // Emit notification to employee
-    const io = req.app.get('io');
-    if (io) {
-      // Emit leave status update event
-      io.emit('leaveStatusUpdated', {
-        employeeId: updatedLeaveRequest.employee._id.toString(),
-        employeeName: updatedLeaveRequest.employee.name,
-        department: updatedLeaveRequest.department,
-        status,
-        managers: managers.map(m => m._id.toString()),
-        leaveRequest: {
-          id: updatedLeaveRequest._id,
-          status,
-          startDate: updatedLeaveRequest.startDate,
-          endDate: updatedLeaveRequest.endDate,
-          leaveType: updatedLeaveRequest.leaveType,
-          managerNote
-        }
-      });
-    }
+    // Managers see the requester's balance to make an informed decision.
+    const employeeFields = req.user.role === 'employee' ? EMPLOYEE_FIELDS : `${EMPLOYEE_FIELDS} leaveBalance`;
 
-    res.json(updatedLeaveRequest);
-  } catch (err) {
-    console.error('Update leave request error:', err);
-    res.status(500).json({ message: 'Server error while updating leave request' });
-  }
-});
-
-// @route   GET /api/leaves/team
-// @desc    Get all leave requests for manager's team
-// @access  Private (Manager)
-router.get('/team', auth, async (req, res) => {
-  try {
-    if (req.user.role !== 'manager') {
-      return res.status(403).json({ message: 'Only managers can view team leaves' });
-    }
-
-    const leaves = await LeaveRequest.find({ department: req.user.department })
-      .populate('employee', 'name email')
+    const leaves = await LeaveRequest.find(filter)
+      .populate('employee', employeeFields)
       .populate('manager', 'name email')
       .sort({ createdAt: -1 });
     res.json(leaves);
-  } catch (err) {
-    console.error('Get team leaves error:', err);
-    res.status(500).json({ message: 'Server error while fetching team leaves' });
-  }
-});
+  })
+);
 
-// Get leaves for logged-in user
-router.get('/my-leaves', auth, async (req, res) => {
-  try {
-    const leaves = await LeaveRequest.find({ employee: req.user._id })
-      .populate('employee', 'name email department')
-      .sort({ createdAt: -1 });
-    
-    res.json(leaves);
-  } catch (error) {
-    console.error('Error fetching user leaves:', error);
-    res.status(500).json({ message: 'Error fetching leaves' });
-  }
-});
+// @route   GET /api/leaves/employee/stats
+// @access  Any signed-in user (their own requests)
+router.get(
+  '/employee/stats',
+  asyncHandler(async (req, res) => {
+    const match = { employee: req.user._id };
+    const [statusRows, typeRows, monthlyRows, recent] = await Promise.all([
+      LeaveRequest.aggregate([{ $match: match }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+      LeaveRequest.aggregate([
+        { $match: { ...match, status: 'approved' } },
+        { $group: { _id: '$leaveType', days: { $sum: '$totalDays' } } },
+      ]),
+      LeaveRequest.aggregate(monthlyPipeline(match, 12)),
+      LeaveRequest.find(match).sort({ createdAt: -1 }).limit(5),
+    ]);
 
-// Manager-specific statistics
-router.get('/manager/stats', auth, async (req, res) => {
-  try {
-    if (req.user.role !== 'manager') {
-      return res.status(403).json({ message: 'Not authorized to view manager statistics' });
+    const daysTaken = { annual: 0, sick: 0, casual: 0 };
+    typeRows.forEach((row) => {
+      daysTaken[row._id] = row.days;
+    });
+
+    res.json({
+      counts: countByStatus(statusRows),
+      daysTaken,
+      monthly: buildMonthlySeries(monthlyRows, 12),
+      recent,
+    });
+  })
+);
+
+// @route   GET /api/leaves/manager/stats
+// @access  Manager (own department)
+router.get(
+  '/manager/stats',
+  authorize('manager'),
+  asyncHandler(async (req, res) => {
+    const department = req.user.department;
+    const match = { department };
+    const today = startOfUtcDay();
+    const [statusRows, monthlyRows, onLeaveToday, teamSize] = await Promise.all([
+      LeaveRequest.aggregate([{ $match: match }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+      LeaveRequest.aggregate(monthlyPipeline(match, 6)),
+      LeaveRequest.countDocuments({ ...match, status: 'approved', startDate: { $lte: today }, endDate: { $gte: today } }),
+      User.countDocuments({ department, role: 'employee', isActive: true }),
+    ]);
+
+    res.json({
+      department,
+      teamSize,
+      onLeaveToday,
+      counts: countByStatus(statusRows),
+      monthly: buildMonthlySeries(monthlyRows, 6),
+    });
+  })
+);
+
+// @route   PATCH /api/leaves/:id
+// @desc    Approve or reject a pending request
+// @access  Manager (same department)
+router.patch(
+  '/:id',
+  authorize('manager'),
+  validate([
+    param('id').isMongoId().withMessage('Invalid leave request id'),
+    body('status').isIn(['approved', 'rejected']).withMessage('Status must be approved or rejected'),
+    body('managerNote').optional({ values: 'null' }).isString().trim().isLength({ max: 500 }).withMessage('Note is too long'),
+  ]),
+  asyncHandler(async (req, res) => {
+    const { status } = req.body;
+    const managerNote = req.body.managerNote || undefined;
+
+    // Atomically claim the request: only a pending request in the manager's
+    // department can transition, so two concurrent decisions cannot both win.
+    const leave = await LeaveRequest.findOneAndUpdate(
+      { _id: req.params.id, department: req.user.department, status: 'pending' },
+      { $set: { status, manager: req.user._id, ...(managerNote && { managerNote }) } },
+      { new: true }
+    );
+
+    if (!leave) {
+      const existing = await LeaveRequest.findById(req.params.id).select('department status');
+      if (!existing) throw new HttpError(404, 'Leave request not found');
+      if (existing.department !== req.user.department) {
+        throw new HttpError(403, 'You can only review requests from your own department');
+      }
+      throw new HttpError(409, `This request has already been ${existing.status}`);
     }
 
-    // Department leave statistics
-    const departmentStats = await LeaveRequest.aggregate([
-      {
-        $match: { department: req.user.department }
-      },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
+    if (status === 'approved') {
+      const balancePath = `leaveBalance.${leave.leaveType}`;
+      const debit = await User.updateOne(
+        { _id: leave.employee, [balancePath]: { $gte: leave.totalDays } },
+        { $inc: { [balancePath]: -leave.totalDays } }
+      );
+      if (debit.modifiedCount === 0) {
+        // Roll the claim back so the request can be reconsidered later.
+        await LeaveRequest.updateOne(
+          { _id: leave._id, status: 'approved' },
+          { $set: { status: 'pending' }, $unset: { manager: 1, managerNote: 1 } }
+        );
+        throw new HttpError(400, `The employee no longer has enough ${leave.leaveType} leave for this request`);
       }
+    }
+
+    await leave.populate([
+      { path: 'employee', select: `${EMPLOYEE_FIELDS} leaveBalance` },
+      { path: 'manager', select: 'name email' },
     ]);
+    notifications.leaveDecided(req.app, leave);
+    res.json(leave);
+  })
+);
 
-    // Recent leave requests in department
-    const recentRequests = await LeaveRequest.find({ 
-      department: req.user.department 
-    })
-    .populate('employee', 'name email')
-    .sort({ createdAt: -1 })
-    .limit(10);
-
-    // Monthly department trends
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-    
-    const monthlyDeptTrends = await LeaveRequest.aggregate([
-      {
-        $match: {
-          department: req.user.department,
-          createdAt: { $gte: threeMonthsAgo }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' }
-          },
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { '_id.year': 1, '_id.month': 1 }
-      }
-    ]);
-
-    res.json({
-      departmentStats,
-      recentRequests,
-      monthlyDeptTrends,
-      department: req.user.department
-    });
-  } catch (error) {
-    console.error('Error fetching manager stats:', error);
-    res.status(500).json({ message: 'Error fetching manager statistics' });
-  }
-});
-
-// Employee-specific statistics
-router.get('/employee/stats', auth, async (req, res) => {
-  try {
-    // Employee's leave history
-    const leaveHistory = await LeaveRequest.find({ employee: req.user._id })
-      .sort({ createdAt: -1 });
-
-    // Leave status distribution for employee
-    const leaveStatusStats = await LeaveRequest.aggregate([
-      {
-        $match: { employee: req.user._id }
-      },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    // Leave type distribution for employee
-    const leaveTypeStats = await LeaveRequest.aggregate([
-      {
-        $match: { employee: req.user._id }
-      },
-      {
-        $group: {
-          _id: '$leaveType',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    // Monthly leave trends for employee (last 12 months)
-    const twelveMonthsAgo = new Date();
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-    
-    const monthlyTrends = await LeaveRequest.aggregate([
-      {
-        $match: {
-          employee: req.user._id,
-          createdAt: { $gte: twelveMonthsAgo }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' }
-          },
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { '_id.year': 1, '_id.month': 1 }
-      }
-    ]);
-
-    res.json({
-      leaveHistory,
-      leaveStatusStats,
-      leaveTypeStats,
-      monthlyTrends
-    });
-  } catch (error) {
-    console.error('Error fetching employee stats:', error);
-    res.status(500).json({ message: 'Error fetching employee statistics' });
-  }
-});
-
-module.exports = router; 
+module.exports = router;

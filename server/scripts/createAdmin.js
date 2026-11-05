@@ -1,61 +1,42 @@
+// Creates (or repairs) the initial administrator account.
+// Usage: ADMIN_EMAIL=you@company.com ADMIN_PASSWORD=... node scripts/createAdmin.js
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
 const User = require('../models/User');
-require('dotenv').config();
 
-const createAdmin = async () => {
-  try {
-    console.log('Connecting to MongoDB...');
-    await mongoose.connect(process.env.MONGODB_URI);
-    console.log('Connected to MongoDB successfully');
+const email = (process.env.ADMIN_EMAIL || 'admin@example.com').toLowerCase();
+const password = process.env.ADMIN_PASSWORD || 'admin123';
 
-    const adminData = {
-      name: 'Admin User',
-      email: 'admin@example.com',
-      password: 'admin123',
+async function createAdmin() {
+  await mongoose.connect(process.env.MONGODB_URI);
+
+  const existing = await User.findOne({ email });
+  if (existing) {
+    existing.role = 'admin';
+    existing.isActive = true;
+    await existing.save();
+    console.log(`Admin account ${email} already existed; role and status confirmed.`);
+  } else {
+    await User.create({
+      name: 'Administrator',
+      email,
+      password,
       role: 'admin',
       department: 'Administration',
       position: 'System Administrator',
       joiningDate: new Date(),
-      leaveBalance: {
-        annual: 30,
-        sick: 15,
-        casual: 15
-      }
-    };
-
-    console.log('Checking for existing admin user...');
-    const existingAdmin = await User.findOne({ email: adminData.email });
-    
-    if (existingAdmin) {
-      console.log('Admin user already exists:', {
-        id: existingAdmin._id,
-        email: existingAdmin.email,
-        role: existingAdmin.role
-      });
-      
-      // Update the admin user to ensure correct role and data
-      existingAdmin.role = 'admin';
-      existingAdmin.department = 'Administration';
-      existingAdmin.position = 'System Administrator';
-      await existingAdmin.save();
-      console.log('Admin user updated successfully');
-      
-      process.exit(0);
-    }
-    
-    console.log('Creating new admin user...');
-    const admin = await User.create(adminData);
-    console.log('Admin user created successfully:', {
-      id: admin._id,
-      email: admin.email,
-      role: admin.role
     });
-    
-    process.exit(0);
-  } catch (error) {
-    console.error('Error creating admin user:', error);
-    process.exit(1);
+    console.log(`Admin account ${email} created.`);
+    if (!process.env.ADMIN_PASSWORD) {
+      console.warn('Using the default password "admin123". Change it immediately or set ADMIN_PASSWORD.');
+    }
   }
-};
+}
 
-createAdmin(); 
+createAdmin()
+  .catch((err) => {
+    console.error('Failed to create admin:', err.message);
+    process.exitCode = 1;
+  })
+  .finally(() => mongoose.disconnect());

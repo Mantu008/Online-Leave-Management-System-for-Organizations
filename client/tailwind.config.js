@@ -1,24 +1,36 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        primary: {
-          main: '#1976d2',
-          light: '#42a5f5',
-          dark: '#1565c0',
+        // Single brand accent (deep teal). Neutrals use Tailwind's slate scale.
+        brand: {
+          50: '#f0fdfa',
+          100: '#ccfbf1',
+          200: '#99f6e4',
+          500: '#14b8a6',
+          600: '#0d9488',
+          700: '#0f766e',
+          800: '#115e59',
+          900: '#134e4a',
         },
-        secondary: {
-          main: '#9c27b0',
-          light: '#ba68c8',
-          dark: '#7b1fa2',
-        },
+      },
+      fontFamily: {
+        sans: [
+          'system-ui',
+          '-apple-system',
+          '"Segoe UI"',
+          'Roboto',
+          '"Helvetica Neue"',
+          'Arial',
+          'sans-serif',
+        ],
+      },
+      maxWidth: {
+        content: '72rem',
       },
     },
   },
   plugins: [],
-} 
+};
