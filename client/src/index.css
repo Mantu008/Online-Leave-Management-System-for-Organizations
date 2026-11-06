@@ -5,6 +5,7 @@
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
   body {
@@ -12,7 +13,7 @@
   }
 
   :focus-visible {
-    @apply outline-none ring-2 ring-brand-600 ring-offset-2 ring-offset-white;
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white;
   }
 
   /* Native date pickers inherit the form text colour. */
@@ -21,19 +22,37 @@
   }
 
   dialog::backdrop {
-    background: rgb(15 23 42 / 0.45);
+    background: rgb(15 23 42 / 0.5);
+    backdrop-filter: blur(2px);
   }
 }
 
 @layer components {
   .control {
-    @apply block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm
-      placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20
+    @apply block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm transition-colors
+      placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15
       disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500;
   }
 
+  textarea.control {
+    @apply h-auto py-2.5;
+  }
+
   .control-invalid {
-    @apply border-rose-400 focus:border-rose-500 focus:ring-rose-500/20;
+    @apply border-rose-400 hover:border-rose-400 focus:border-rose-500 focus:ring-rose-500/15;
+  }
+
+  /* Faint grid used behind hero and auth artwork. */
+  .bg-grid {
+    background-image: linear-gradient(to right, rgb(255 255 255 / 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.06) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .bg-grid-light {
+    background-image: linear-gradient(to right, rgb(15 23 42 / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(15 23 42 / 0.045) 1px, transparent 1px);
+    background-size: 40px 40px;
   }
 }
 
@@ -42,6 +61,7 @@
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }
@@ -49,11 +69,11 @@
 /* Doubled class selectors outrank the styles notistack injects at runtime. */
 /* Toasts (notistack): match the application palette instead of the library's stock colours. */
 .notistack-MuiContent.notistack-MuiContent {
-  @apply rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg;
+  @apply rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-raised;
 }
 .notistack-MuiContent.notistack-MuiContent-success {
-  @apply bg-emerald-700;
+  @apply bg-emerald-600;
 }
 .notistack-MuiContent.notistack-MuiContent-error {
-  @apply bg-rose-700;
+  @apply bg-rose-600;
 }

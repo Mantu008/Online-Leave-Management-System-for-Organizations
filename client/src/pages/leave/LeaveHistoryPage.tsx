@@ -1,17 +1,16 @@
 import { useMemo, useState } from 'react';
-import { Download, Plus } from 'lucide-react';
+import { CalendarClock, Download, Plus } from 'lucide-react';
 import { useSnackbar } from 'notistack';
 import { useAppSelector } from '../../store';
 import { leavesApi } from '../../services/api';
 import { errorMessage } from '../../services/http';
 import { useAsync } from '../../hooks/useAsync';
 import { useLiveUpdates } from '../../hooks/useLiveUpdates';
-import { StatusBadge } from '../../components/ui/Badge';
+import { LeaveTypeBadge, StatusBadge } from '../../components/ui/Badge';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { EmptyState, ErrorState, LoadingState } from '../../components/ui/Feedback';
 import { PageHeader, Panel, SegmentedControl } from '../../components/ui/Layout';
 import { Pagination, Table, TBody, Td, Th, THead } from '../../components/ui/Table';
-import { LEAVE_TYPE_LABELS } from '../../lib/constants';
 import { formatDate, formatDateRange } from '../../lib/dates';
 import { downloadLeaveReport } from '../../lib/leaveReport';
 import type { LeaveStatus } from '../../types';
@@ -85,15 +84,24 @@ export default function LeaveHistoryPage() {
           />
         }
         title="Requests"
+        description="Filter by status to narrow the list"
       >
         {loading && !data ? (
-          <LoadingState />
+          <LoadingState rows={5} />
         ) : error ? (
           <ErrorState message={error} onRetry={reload} />
         ) : filtered.length === 0 ? (
           <EmptyState
+            icon={CalendarClock}
             title={filter === 'all' ? 'No leave requests yet' : `No ${filter} requests`}
-            description={filter === 'all' ? 'When you request leave it will be listed here.' : undefined}
+            description={filter === 'all' ? 'When you request leave it will be listed here.' : 'Try another filter to see more requests.'}
+            action={
+              filter === 'all' && (
+                <ButtonLink to="/leave/apply" size="sm" icon={<Plus className="h-4 w-4" aria-hidden="true" />}>
+                  Request leave
+                </ButtonLink>
+              )
+            }
           />
         ) : (
           <>
@@ -110,8 +118,10 @@ export default function LeaveHistoryPage() {
                 {visible.map((leave) => (
                   <tr key={leave._id}>
                     <Td className="whitespace-nowrap font-medium text-slate-900">{formatDateRange(leave.startDate, leave.endDate)}</Td>
-                    <Td>{LEAVE_TYPE_LABELS[leave.leaveType]}</Td>
-                    <Td className="text-right tabular-nums">{leave.totalDays}</Td>
+                    <Td>
+                      <LeaveTypeBadge type={leave.leaveType} />
+                    </Td>
+                    <Td className="text-right font-semibold tabular-nums text-slate-900">{leave.totalDays}</Td>
                     <Td>
                       <StatusBadge status={leave.status} />
                     </Td>

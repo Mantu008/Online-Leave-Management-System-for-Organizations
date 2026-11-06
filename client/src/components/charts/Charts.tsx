@@ -10,19 +10,20 @@ import {
 import { Bar } from 'react-chartjs-2';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
+ChartJS.defaults.font.family = "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 
 // Colours follow the data-viz reference palette: one categorical blue for a
 // single series, and the reserved status colours for leave states. Status is
 // never conveyed by colour alone — every chart has a legend and a data table.
 export const SERIES_COLORS = {
-  primary: '#2a78d6',
-  approved: '#0ca30c',
-  pending: '#fab219',
-  rejected: '#d03b3b',
+  primary: '#6366f1',
+  approved: '#10b981',
+  pending: '#f59e0b',
+  rejected: '#f43f5e',
 } as const;
 
 const INK_MUTED = '#64748b';
-const GRIDLINE = '#e2e8f0';
+const GRIDLINE = '#f1f5f9';
 const SURFACE = '#ffffff';
 
 export interface Series {
@@ -43,10 +44,10 @@ interface BarChartProps {
 function Legend({ series }: { series: Series[] }) {
   if (series.length < 2) return null;
   return (
-    <ul className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600" aria-hidden="true">
+    <ul className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium text-slate-600" aria-hidden="true">
       {series.map((s) => (
         <li key={s.label} className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
+          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
           {s.label}
         </li>
       ))}
@@ -95,9 +96,9 @@ export function BarChart({ labels, series, title, orientation = 'vertical', heig
       data: s.data,
       backgroundColor: s.color,
       hoverBackgroundColor: s.color,
-      maxBarThickness: 24,
+      maxBarThickness: 28,
       // Rounded data-end on the outermost segment only, square at the baseline.
-      borderRadius: i === last ? (horizontal ? { topRight: 4, bottomRight: 4 } : { topLeft: 4, topRight: 4 }) : 0,
+      borderRadius: i === last ? (horizontal ? { topRight: 6, bottomRight: 6 } : { topLeft: 6, topRight: 6 }) : 0,
       borderSkipped: false,
       // A surface-coloured gap between stacked segments.
       borderColor: SURFACE,
@@ -114,7 +115,7 @@ export function BarChart({ labels, series, title, orientation = 'vertical', heig
   };
   const categoryAxis = {
     stacked,
-    border: { color: '#cbd5e1' },
+    border: { color: '#e2e8f0' },
     grid: { display: false },
     // Skip labels rather than rotate them when space is tight.
     ticks: { color: INK_MUTED, font: { size: 11 }, maxRotation: 0, autoSkip: true, autoSkipPadding: 12 },
@@ -131,8 +132,8 @@ export function BarChart({ labels, series, title, orientation = 'vertical', heig
       legend: { display: false },
       tooltip: {
         backgroundColor: '#0f172a',
-        padding: 10,
-        cornerRadius: 6,
+        padding: 12,
+        cornerRadius: 8,
         boxPadding: 4,
         usePointStyle: true,
         titleFont: { weight: 600 },

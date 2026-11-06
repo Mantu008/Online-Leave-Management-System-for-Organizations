@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import { useAppDispatch, useAppSelector } from './store';
 import { refreshUser } from './store/slices/authSlice';
@@ -7,8 +7,9 @@ import { addNotification } from './store/slices/notificationSlice';
 import { connectRealtime } from './services/realtime';
 import { AppShell } from './components/layout/AppShell';
 import { GuestOnly, RequireAuth, RoleGate } from './components/layout/Guards';
-import { LoadingState } from './components/ui/Feedback';
+import { PageLoader } from './components/ui/Feedback';
 
+const LandingPage = lazy(() => import('./pages/landing/LandingPage'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
@@ -53,9 +54,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <SessionSync />
-      <Suspense fallback={<LoadingState className="min-h-screen" />}>
+      <Suspense fallback={<PageLoader className="min-h-screen" />}>
         <Routes>
           <Route element={<GuestOnly />}>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
           </Route>
@@ -75,8 +77,6 @@ export default function App() {
               <Route path="*" element={<NotFoundPage />} />
             </Route>
           </Route>
-
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

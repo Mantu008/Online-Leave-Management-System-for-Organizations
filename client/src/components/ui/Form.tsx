@@ -15,7 +15,7 @@ interface FieldShellProps {
 export function FieldShell({ id, label, hint, error, children, className }: FieldShellProps) {
   return (
     <div className={className}>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-slate-800">
         {label}
       </label>
       {children}
@@ -117,7 +117,7 @@ export function CheckboxField({ name, label, hint }: { name: string; label: stri
       <input
         type="checkbox"
         {...field}
-        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-600"
+        className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-brand-600"
       />
       <span>
         <span className="block text-sm font-medium text-slate-700">{label}</span>
