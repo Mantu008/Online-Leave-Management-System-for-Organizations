@@ -5,6 +5,8 @@ interface ImportMetaEnv {
   readonly VITE_APP_API_URL?: string;
   /** Origin of the realtime (Socket.IO) server. Realtime is disabled when unset. */
   readonly VITE_APP_SOCKET_URL?: string;
+  /** Set to "false" to hide the one-click demo accounts on the login page. */
+  readonly VITE_DEMO_LOGIN?: string;
 }
 
 interface ImportMeta {

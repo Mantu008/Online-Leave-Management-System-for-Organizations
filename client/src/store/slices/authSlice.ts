@@ -1,7 +1,7 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { authApi } from '../../services/api';
 import { errorMessage } from '../../services/http';
-import type { LoginCredentials, RegisterInput, User } from '../../types';
+import type { LoginCredentials, RegisterInput, Role, User } from '../../types';
 
 export interface AuthState {
   user: User | null;
@@ -37,6 +37,14 @@ export const login = createAsyncThunk('auth/login', async (credentials: LoginCre
     return await authApi.login(credentials);
   } catch (error) {
     return rejectWithValue(errorMessage(error, 'Sign in failed'));
+  }
+});
+
+export const demoLogin = createAsyncThunk('auth/demoLogin', async (role: Role, { rejectWithValue }) => {
+  try {
+    return await authApi.demoLogin(role);
+  } catch (error) {
+    return rejectWithValue(errorMessage(error, 'Demo sign in failed'));
   }
 });
 
@@ -92,6 +100,9 @@ const authSlice = createSlice({
       .addCase(login.pending, pending)
       .addCase(login.fulfilled, fulfilled)
       .addCase(login.rejected, rejected)
+      .addCase(demoLogin.pending, pending)
+      .addCase(demoLogin.fulfilled, fulfilled)
+      .addCase(demoLogin.rejected, rejected)
       .addCase(register.pending, pending)
       .addCase(register.fulfilled, fulfilled)
       .addCase(register.rejected, rejected)

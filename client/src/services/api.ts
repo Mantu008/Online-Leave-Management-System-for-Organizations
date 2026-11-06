@@ -13,6 +13,7 @@ import type {
   LoginCredentials,
   ManagerStats,
   RegisterInput,
+  Role,
   UpdateUserInput,
   User,
 } from '../types';
@@ -21,6 +22,7 @@ const data = <T>(promise: Promise<{ data: T }>) => promise.then((res) => res.dat
 
 export const authApi = {
   login: (credentials: LoginCredentials) => data(http.post<AuthResponse>('/auth/login', credentials)),
+  demoLogin: (role: Role) => data(http.post<AuthResponse>('/auth/demo', { role })),
   register: (input: RegisterInput) => data(http.post<AuthResponse>('/auth/register', input)),
   me: () => data(http.get<User>('/auth/me')),
 };

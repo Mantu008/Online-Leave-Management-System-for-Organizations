@@ -7,6 +7,7 @@ const { HttpError, asyncHandler } = require('../utils/http');
 const { sendLoginNotification, isMailConfigured } = require('../utils/email');
 const notifications = require('../services/notifications');
 const userRules = require('../validators/userRules');
+const { DEMO_ACCOUNTS, isDemoLoginEnabled, getDemoUser } = require('../services/demoAccounts');
 
 const router = express.Router();
 
@@ -74,6 +75,23 @@ router.post(
         timestamp: user.lastLogin.toISOString(),
       }).catch((err) => console.warn('[mail] login notification failed:', err.message));
     }
+
+    res.json({ token: signToken(user), user });
+  })
+);
+
+// @route   POST /api/auth/demo
+// @access  Public (unless DEMO_LOGIN=false)
+// Signs in as a ready-made demo account for the given role.
+router.post(
+  '/demo',
+  validate([body('role').isIn(Object.keys(DEMO_ACCOUNTS)).withMessage('Unknown demo role')]),
+  asyncHandler(async (req, res) => {
+    if (!isDemoLoginEnabled()) throw new HttpError(404, 'Demo login is disabled');
+
+    const user = await getDemoUser(req.body.role);
+    user.lastLogin = new Date();
+    await User.updateOne({ _id: user._id }, { $set: { lastLogin: user.lastLogin } });
 
     res.json({ token: signToken(user), user });
   })

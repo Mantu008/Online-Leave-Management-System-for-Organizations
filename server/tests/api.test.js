@@ -275,3 +275,30 @@ test('statistics endpoints return complete series', async () => {
   const forbidden = await api.request('GET', '/admin/stats', { token: tokens.itManager });
   assert.equal(forbidden.status, 403);
 });
+
+test('demo login signs in as each role and repairs tampered demo accounts', async () => {
+  for (const role of ['employee', 'manager', 'admin']) {
+    const res = await api.request('POST', '/auth/demo', { body: { role } });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.user.role, role);
+    assert.ok(res.body.token);
+    assert.equal(res.body.user.password, undefined);
+  }
+
+  await User.updateOne({ email: 'demo.manager@leave-demo.com' }, { $set: { isActive: false, role: 'employee' } });
+  const repaired = await api.request('POST', '/auth/demo', { body: { role: 'manager' } });
+  assert.equal(repaired.status, 200);
+  assert.equal(repaired.body.user.role, 'manager');
+  assert.equal(repaired.body.user.isActive, true);
+
+  const bad = await api.request('POST', '/auth/demo', { body: { role: 'superuser' } });
+  assert.equal(bad.status, 400);
+
+  process.env.DEMO_LOGIN = 'false';
+  try {
+    const off = await api.request('POST', '/auth/demo', { body: { role: 'admin' } });
+    assert.equal(off.status, 404);
+  } finally {
+    delete process.env.DEMO_LOGIN;
+  }
+});
