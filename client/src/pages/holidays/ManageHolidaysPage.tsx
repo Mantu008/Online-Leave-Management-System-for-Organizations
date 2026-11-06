@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Form, Formik } from 'formik';
 import * as Yup from 'yup';
-import { Plus } from 'lucide-react';
+import { CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useSnackbar } from 'notistack';
 import { holidaysApi } from '../../services/api';
 import { errorMessage } from '../../services/http';
@@ -83,7 +83,7 @@ function HolidayFormModal({ editing, onClose, onSaved }: { editing: Editing; onC
             </div>
             <TextareaField name="description" label="Notes (optional)" rows={2} maxLength={500} />
             <CheckboxField name="isRecurring" label="Repeats every year" hint="Observed on the same date in following years." />
-            <div className="-mx-5 -mb-4 mt-2 flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+            <div className="-mx-6 -mb-5 mt-2 flex justify-end gap-2 border-t border-slate-100 bg-slate-50/80 px-6 py-4">
               <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
                 Cancel
               </Button>
@@ -124,6 +124,7 @@ export default function ManageHolidaysPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Administration"
         title="Holidays"
         description="Holidays are visible to everyone and block leave requests on those dates."
         actions={
@@ -135,12 +136,14 @@ export default function ManageHolidaysPage() {
 
       <Panel title={`${year} holidays`} actions={<YearSwitcher year={year} onChange={setYear} />}>
         {loading ? (
-          <LoadingState />
+          <LoadingState rows={5} />
         ) : error ? (
           <ErrorState message={error} onRetry={reload} />
         ) : !data || data.length === 0 ? (
           <EmptyState
+            icon={CalendarDays}
             title={`No holidays for ${year}`}
+            description="Publish public and company holidays so employees can plan around them."
             action={
               <Button variant="secondary" onClick={() => setEditing({ mode: 'create' })}>
                 Add the first one
@@ -152,10 +155,21 @@ export default function ManageHolidaysPage() {
             holidays={data}
             actions={(holiday) => (
               <div className="flex justify-end gap-1">
-                <Button size="sm" variant="ghost" onClick={() => setEditing({ mode: 'edit', holiday })}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setEditing({ mode: 'edit', holiday })}
+                  icon={<Pencil className="h-3.5 w-3.5" aria-hidden="true" />}
+                >
                   Edit
                 </Button>
-                <Button size="sm" variant="ghost" className="text-rose-700 hover:bg-rose-50 hover:text-rose-800" onClick={() => setDeleting(holiday)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                  onClick={() => setDeleting(holiday)}
+                  icon={<Trash2 className="h-3.5 w-3.5" aria-hidden="true" />}
+                >
                   Delete
                 </Button>
               </div>

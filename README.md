@@ -2,6 +2,18 @@
 
 A leave request and approval system for organisations. Employees request leave, managers approve or reject requests from their department, and administrators manage people and the holiday calendar.
 
+## Screenshots
+
+| Landing page | Sign in |
+| --- | --- |
+| ![Landing page](docs/screenshots/landing.png) | ![Sign in](docs/screenshots/login.png) |
+| **Employee dashboard** | **Manager dashboard** |
+| ![Employee dashboard](docs/screenshots/employee-dashboard.png) | ![Manager dashboard](docs/screenshots/manager-dashboard.png) |
+| **Team calendar** | **Admin overview** |
+| ![Team calendar](docs/screenshots/manager-team.png) | ![Admin overview](docs/screenshots/admin-dashboard.png) |
+
+The product name shown in the UI defaults to **LeaveFlow**; set `VITE_APP_NAME` in the client environment to white-label it.
+
 ## Features
 
 **Employees**

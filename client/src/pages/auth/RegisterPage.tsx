@@ -35,11 +35,11 @@ export default function RegisterPage() {
     <AuthLayout
       wide
       title="Create your account"
-      subtitle="New accounts start as employees. An administrator can assign manager or admin access."
+      subtitle="Get started in under a minute. New accounts join as employees; an admin can grant manager or admin access."
       footer={
         <>
           Already have an account?{' '}
-          <Link to="/login" className="font-medium text-brand-700 hover:text-brand-900 hover:underline">
+          <Link to="/login" className="font-semibold text-brand-600 hover:text-brand-700">
             Sign in
           </Link>
         </>
@@ -63,8 +63,8 @@ export default function RegisterPage() {
       >
         <Form noValidate className="space-y-4">
           {error && <Alert>{error}</Alert>}
-          <TextField name="name" label="Full name" autoComplete="name" autoFocus />
-          <TextField name="email" label="Work email" type="email" autoComplete="email" />
+          <TextField name="name" label="Full name" autoComplete="name" placeholder="Jane Cooper" autoFocus />
+          <TextField name="email" label="Work email" type="email" autoComplete="email" placeholder="you@company.com" />
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField name="password" label="Password" type="password" autoComplete="new-password" hint="At least 6 characters" />
             <TextField name="confirmPassword" label="Confirm password" type="password" autoComplete="new-password" />
@@ -76,10 +76,10 @@ export default function RegisterPage() {
             options={DEPARTMENTS.map((d) => ({ value: d, label: d }))}
           />
           <div className="grid gap-4 sm:grid-cols-2">
-            <TextField name="position" label="Job title" autoComplete="organization-title" />
+            <TextField name="position" label="Job title" autoComplete="organization-title" placeholder="Product Designer" />
             <TextField name="joiningDate" label="Joining date" type="date" max={todayInputValue()} />
           </div>
-          <Button type="submit" className="w-full" loading={submitting}>
+          <Button type="submit" size="lg" className="w-full" loading={submitting}>
             Create account
           </Button>
         </Form>

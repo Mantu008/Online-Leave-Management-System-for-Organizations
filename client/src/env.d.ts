@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_APP_SOCKET_URL?: string;
   /** Set to "false" to hide the one-click demo accounts on the login page. */
   readonly VITE_DEMO_LOGIN?: string;
+  /** Product name shown in the UI. Defaults to "LeaveFlow". */
+  readonly VITE_APP_NAME?: string;
 }
 
 interface ImportMeta {

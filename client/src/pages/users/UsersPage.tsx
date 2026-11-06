@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Form, Formik } from 'formik';
 import * as Yup from 'yup';
-import { Plus, Search } from 'lucide-react';
+import { Pencil, Search, Trash2, UserPlus, Users } from 'lucide-react';
 import { useSnackbar } from 'notistack';
 import { useAppSelector } from '../../store';
 import { usersApi } from '../../services/api';
 import { errorMessage } from '../../services/http';
 import { useAsync } from '../../hooks/useAsync';
 import { Tag } from '../../components/ui/Badge';
+import { cx } from '../../lib/format';
 import { Button } from '../../components/ui/Button';
 import { Alert, EmptyState, ErrorState, LoadingState } from '../../components/ui/Feedback';
 import { CheckboxField, SelectField, TextField } from '../../components/ui/Form';
@@ -126,7 +127,7 @@ function UserFormModal({
             {user && !isSelf && (
               <CheckboxField name="isActive" label="Account active" hint="Inactive accounts can't sign in. Their leave history is kept." />
             )}
-            <div className="-mx-5 -mb-4 mt-2 flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+            <div className="-mx-6 -mb-5 mt-2 flex justify-end gap-2 border-t border-slate-100 bg-slate-50/80 px-6 py-4">
               <Button variant="secondary" onClick={close} disabled={isSubmitting}>
                 Cancel
               </Button>
@@ -138,6 +139,20 @@ function UserFormModal({
         )}
       </Formik>
     </Modal>
+  );
+}
+
+const ROLE_STYLES: Record<Role, string> = {
+  employee: 'bg-slate-50 text-slate-700 ring-slate-200',
+  manager: 'bg-sky-50 text-sky-700 ring-sky-600/20',
+  admin: 'bg-violet-50 text-violet-700 ring-violet-600/20',
+};
+
+function RoleBadge({ role }: { role: Role }) {
+  return (
+    <span className={cx('inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset', ROLE_STYLES[role])}>
+      {ROLE_LABELS[role]}
+    </span>
   );
 }
 
@@ -180,17 +195,18 @@ export default function UsersPage() {
   return (
     <>
       <PageHeader
-        title="Users"
-        description="Manage accounts, roles and departments."
+        eyebrow="Administration"
+        title="People"
+        description="Manage accounts, roles, departments and leave access."
         actions={
-          <Button onClick={() => setForm({ open: true, user: null })} icon={<Plus className="h-4 w-4" aria-hidden="true" />}>
-            Add user
+          <Button onClick={() => setForm({ open: true, user: null })} icon={<UserPlus className="h-4 w-4" aria-hidden="true" />}>
+            Add person
           </Button>
         }
       />
 
       <Panel>
-        <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:px-5">
+        <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:px-6">
           <div className="relative sm:w-72">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
             <input
@@ -222,8 +238,8 @@ export default function UsersPage() {
             ))}
           </select>
           {data && (
-            <span className="text-xs text-slate-500 sm:ml-auto">
-              {filtered.length} of {data.length}
+            <span className="text-xs font-medium text-slate-500 sm:ml-auto">
+              Showing {filtered.length} of {data.length} people
             </span>
           )}
         </div>
@@ -233,7 +249,7 @@ export default function UsersPage() {
         ) : error ? (
           <ErrorState message={error} onRetry={reload} />
         ) : filtered.length === 0 ? (
-          <EmptyState title="No users match your filters" />
+          <EmptyState icon={Users} title="No people match your filters" description="Try a different search term or role." />
         ) : (
           <>
             <Table caption="Users">
@@ -257,26 +273,48 @@ export default function UsersPage() {
                         <div className="flex items-center gap-3">
                           <Avatar name={u.name} />
                           <div className="min-w-0">
-                            <p className="truncate font-medium text-slate-900">
+                            <p className="truncate font-semibold text-slate-900">
                               {u.name}
-                              {isSelf && <span className="ml-1.5 text-xs font-normal text-slate-400">(you)</span>}
+                              {isSelf && <span className="ml-1.5 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-700">You</span>}
                             </p>
                             <p className="truncate text-xs text-slate-500">{u.email}</p>
                           </div>
                         </div>
                       </Td>
-                      <Td>{ROLE_LABELS[u.role]}</Td>
+                      <Td>
+                        <RoleBadge role={u.role} />
+                      </Td>
                       <Td>{u.department}</Td>
                       <Td>{u.position}</Td>
                       <Td className="whitespace-nowrap text-slate-500">{formatDate(u.joiningDate)}</Td>
-                      <Td>{u.isActive ? <Tag>Active</Tag> : <Tag className="bg-slate-100 text-slate-500">Inactive</Tag>}</Td>
+                      <Td>
+                        {u.isActive ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                            Active
+                          </span>
+                        ) : (
+                          <Tag className="text-slate-500">Inactive</Tag>
+                        )}
+                      </Td>
                       <Td className="whitespace-nowrap text-right">
                         <div className="flex justify-end gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => setForm({ open: true, user: u })}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setForm({ open: true, user: u })}
+                            icon={<Pencil className="h-3.5 w-3.5" aria-hidden="true" />}
+                          >
                             Edit
                           </Button>
                           {!isSelf && (
-                            <Button size="sm" variant="ghost" className="text-rose-700 hover:bg-rose-50 hover:text-rose-800" onClick={() => setDeleting(u)}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                              onClick={() => setDeleting(u)}
+                              icon={<Trash2 className="h-3.5 w-3.5" aria-hidden="true" />}
+                            >
                               Delete
                             </Button>
                           )}

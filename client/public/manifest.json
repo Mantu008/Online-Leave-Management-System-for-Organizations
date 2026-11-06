@@ -1,12 +1,12 @@
 {
-  "short_name": "Leave",
-  "name": "Leave Management",
+  "short_name": "LeaveFlow",
+  "name": "LeaveFlow · Leave management",
   "icons": [
     { "src": "favicon.svg", "type": "image/svg+xml", "sizes": "any" },
     { "src": "favicon.ico", "type": "image/x-icon", "sizes": "64x64 32x32 24x24 16x16" }
   ],
   "start_url": "/",
   "display": "standalone",
-  "theme_color": "#0f766e",
+  "theme_color": "#4f46e5",
   "background_color": "#f8fafc"
 }

@@ -39,15 +39,15 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         if (!busy) onClose();
       }}
       className={cx(
-        'm-auto w-[calc(100%-2rem)] rounded-lg border border-slate-200 bg-white p-0 text-slate-900 shadow-xl',
+        'm-auto w-[calc(100%-2rem)] rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl',
         size === 'sm' ? 'max-w-md' : 'max-w-lg'
       )}
     >
       {open && (
         <div className="flex max-h-[85vh] flex-col">
-          <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+          <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
             <div>
-              <h2 id={titleId} className="text-base font-semibold">
+              <h2 id={titleId} className="text-lg font-semibold tracking-tight">
                 {title}
               </h2>
               {description && <div className="mt-1 text-sm text-slate-500">{description}</div>}
@@ -56,14 +56,14 @@ export function Modal({ open, onClose, title, description, children, footer, siz
               type="button"
               onClick={onClose}
               disabled={busy}
-              className="-m-1 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+              className="-m-1.5 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
               aria-label="Close"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
-          {children && <div className="overflow-y-auto px-5 py-4">{children}</div>}
-          {footer && <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">{footer}</div>}
+          {children && <div className="overflow-y-auto px-6 py-5">{children}</div>}
+          {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50/80 px-6 py-4">{footer}</div>}
         </div>
       )}
     </dialog>

@@ -1,4 +1,4 @@
-import { CalendarDays, FileText, Info, UserPlus, type LucideIcon } from 'lucide-react';
+import { BellOff, CalendarDays, CheckCheck, FileText, Info, UserPlus, type LucideIcon } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { clearNotifications, markAllAsRead, markAsRead, selectUnreadCount } from '../../store/slices/notificationSlice';
 import { Button } from '../../components/ui/Button';
@@ -7,6 +7,13 @@ import { PageHeader, Panel } from '../../components/ui/Layout';
 import { formatDateTime, formatRelative } from '../../lib/dates';
 import { cx } from '../../lib/format';
 import type { NotificationType } from '../../types';
+
+const TONES: Record<NotificationType, string> = {
+  leave: 'bg-brand-50 text-brand-600',
+  holiday: 'bg-rose-50 text-rose-600',
+  user: 'bg-emerald-50 text-emerald-600',
+  system: 'bg-slate-100 text-slate-600',
+};
 
 const ICONS: Record<NotificationType, LucideIcon> = {
   leave: FileText,
@@ -29,7 +36,12 @@ export default function NotificationsPage() {
         actions={
           items.length > 0 && (
             <>
-              <Button variant="secondary" onClick={() => dispatch(markAllAsRead())} disabled={unread === 0}>
+              <Button
+                variant="secondary"
+                onClick={() => dispatch(markAllAsRead())}
+                disabled={unread === 0}
+                icon={<CheckCheck className="h-4 w-4" aria-hidden="true" />}
+              >
                 Mark all as read
               </Button>
               <Button variant="ghost" onClick={() => dispatch(clearNotifications())}>
@@ -43,7 +55,8 @@ export default function NotificationsPage() {
       <Panel>
         {items.length === 0 ? (
           <EmptyState
-            title="No notifications"
+            icon={BellOff}
+            title="You're all caught up"
             description={
               realtimeEnabled
                 ? 'Leave decisions, new requests and holiday announcements will appear here as they happen.'
@@ -60,11 +73,13 @@ export default function NotificationsPage() {
                     type="button"
                     onClick={() => dispatch(markAsRead(n.id))}
                     className={cx(
-                      'flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 sm:px-5',
-                      !n.read && 'bg-brand-50/40'
+                      'flex w-full items-start gap-3.5 px-4 py-4 text-left transition-colors hover:bg-slate-50 sm:px-6',
+                      !n.read && 'bg-brand-50/50'
                     )}
                   >
-                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                    <span className={cx('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', TONES[n.type] ?? TONES.system)}>
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                    </span>
                     <span className="min-w-0 flex-1">
                       <span className={cx('block', n.read ? 'text-slate-600' : 'font-medium text-slate-900')}>{n.message}</span>
                       <time dateTime={n.createdAt} title={formatDateTime(n.createdAt)} className="mt-0.5 block text-xs text-slate-500">
@@ -72,7 +87,7 @@ export default function NotificationsPage() {
                       </time>
                     </span>
                     {!n.read && (
-                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-600">
+                      <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-brand-500 ring-4 ring-brand-100">
                         <span className="sr-only">Unread</span>
                       </span>
                     )}

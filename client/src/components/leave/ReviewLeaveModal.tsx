@@ -5,6 +5,8 @@ import { errorMessage } from '../../services/http';
 import { LEAVE_TYPE_LABELS } from '../../lib/constants';
 import { formatDateRange, formatDateTime } from '../../lib/dates';
 import { plural } from '../../lib/format';
+import { LeaveTypeBadge } from '../ui/Badge';
+import { Avatar } from '../ui/Layout';
 import type { LeaveRequest } from '../../types';
 import { Button } from '../ui/Button';
 import { Alert } from '../ui/Feedback';
@@ -61,7 +63,7 @@ export function ReviewLeaveModal({ request, onClose, onDecided }: Props) {
           <Button variant="danger" onClick={() => decide('rejected')} loading={submitting === 'rejected'} disabled={submitting !== null}>
             Reject
           </Button>
-          <Button onClick={() => decide('approved')} loading={submitting === 'approved'} disabled={submitting !== null}>
+          <Button variant="success" onClick={() => decide('approved')} loading={submitting === 'approved'} disabled={submitting !== null}>
             Approve
           </Button>
         </>
@@ -70,12 +72,21 @@ export function ReviewLeaveModal({ request, onClose, onDecided }: Props) {
       {request && (
         <div className="space-y-4">
           {error && <Alert>{error}</Alert>}
-          <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-2.5 text-sm">
-            <dt className="text-slate-500">Employee</dt>
-            <dd className="font-medium text-slate-900">{request.employee?.name ?? 'Removed user'}</dd>
+          <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3.5 ring-1 ring-inset ring-slate-200/70">
+            <Avatar name={request.employee?.name ?? '?'} className="h-11 w-11 text-sm" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold text-slate-900">{request.employee?.name ?? 'Removed user'}</p>
+              {request.employee?.email && <p className="truncate text-xs text-slate-500">{request.employee.email}</p>}
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold leading-none tabular-nums text-slate-900">{request.totalDays}</p>
+              <p className="text-xs text-slate-500">{request.totalDays === 1 ? 'day' : 'days'}</p>
+            </div>
+          </div>
+          <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-3 text-sm">
             <dt className="text-slate-500">Leave</dt>
             <dd>
-              {LEAVE_TYPE_LABELS[request.leaveType]} · {plural(request.totalDays, 'day')}
+              <LeaveTypeBadge type={request.leaveType} />
             </dd>
             <dt className="text-slate-500">Dates</dt>
             <dd>{formatDateRange(request.startDate, request.endDate)}</dd>
